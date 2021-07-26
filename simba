@@ -154,7 +154,11 @@ my_parser.add_argument(
     action='store_true',
     help='Error rate for simulation')
 
-
+my_parser.add_argument(
+    '-n', 
+    '--no_tree_png',
+    action='store_true',
+    help='No tree output')
 
 ##############################################################################
 # Parse input
@@ -189,6 +193,8 @@ read_length = args.read_length
 target_coverage = args.target_coverage
 
 execute = args.execute
+
+disable_tree2file = args.no_tree_png
 
 
 random.seed()
@@ -486,31 +492,32 @@ with open(output_tree, 'w') as outfile:
 ##########################################
 
 # t = Tree(nwk)
-t = Tree( nwk, quoted_node_names=True, format=1)
+if not disable_tree2file:
+    t = Tree( nwk, quoted_node_names=True, format=1)
 
-ts = TreeStyle()
-ts.show_leaf_name = False
+    ts = TreeStyle()
+    ts.show_leaf_name = False
 
-def my_layout(node):
-        if node.is_leaf():
-            Name = TextFace(
-                node.name, 
-                tight_text=True, 
-                fsize=10)
-            Lineage = TextFace(genome2lin[node.name],
-                tight_text=True, 
-                fsize=10)
-            Lineage.margin_left = 20
-            Name.margin_left = 10
-            add_face_to_node(Name, node, column=1, position='aligned')
-            add_face_to_node(Lineage, node, column=2, position='aligned')
+    def my_layout(node):
+            if node.is_leaf():
+                Name = TextFace(
+                    node.name, 
+                    tight_text=True, 
+                    fsize=10)
+                Lineage = TextFace(genome2lin[node.name],
+                    tight_text=True, 
+                    fsize=10)
+                Lineage.margin_left = 20
+                Name.margin_left = 10
+                add_face_to_node(Name, node, column=1, position='aligned')
+                add_face_to_node(Lineage, node, column=2, position='aligned')
 
 
-ts.min_leaf_separation = 20
-ts.branch_vertical_margin = 10
-ts.layout_fn = my_layout
+    ts.min_leaf_separation = 20
+    ts.branch_vertical_margin = 10
+    ts.layout_fn = my_layout
 
-t.render(output_tree_img, w=2000, tree_style=ts)
+    t.render(output_tree_img, w=2000, tree_style=ts)
 
 
 with open(output_meta, 'w') as outfile:
