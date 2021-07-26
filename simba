@@ -155,10 +155,10 @@ my_parser.add_argument(
     help='Error rate for simulation')
 
 my_parser.add_argument(
-    '-T', 
-    '--no_tree_png',
+    '-P', 
+    '--no_plots',
     action='store_true',
-    help='No tree output')
+    help='No plots (commandline)')
 
 ##############################################################################
 # Parse input
@@ -194,7 +194,7 @@ target_coverage = args.target_coverage
 
 execute = args.execute
 
-disable_tree2file = args.no_tree_png
+disable_plots = args.no_plots
 
 
 random.seed()
@@ -406,7 +406,7 @@ def mkdir_if_not_exists(folder):
 
 def randomize_distr(distr):
     sum_old = 0
-    sum_new = 0    
+    sum_new = 0
     for i in range(0, len(distr)):
         # weight = 1 / (i/2+1)
         # weight = 3/(i+1)
@@ -492,7 +492,7 @@ with open(output_tree, 'w') as outfile:
 ##########################################
 
 # t = Tree(nwk)
-if not disable_tree2file:
+if not disable_plots:
     t = Tree( nwk, quoted_node_names=True, format=1)
 
     ts = TreeStyle()
@@ -559,10 +559,11 @@ selected_genomes = [ Genome(sg, g2path(sg), fasta_length(g2path(sg))) for sg in 
 # Render newick tree!
 ##########################################
 
-data_points = len(genomes)
+data_points = len(selected_genomes)
 x, y = pareto_distr(data_points)
 
-plot_distr(x, y, distribution_output)
+if not disable_plots:
+    plot_distr(x, y, distribution_output)
 
 
 
