@@ -155,7 +155,7 @@ my_parser.add_argument(
     help='Error rate for simulation')
 
 my_parser.add_argument(
-    '-n', 
+    '-T', 
     '--no_tree_png',
     action='store_true',
     help='No tree output')
