@@ -160,6 +160,14 @@ my_parser.add_argument(
     action='store_true',
     help='No plots (commandline)')
 
+my_parser.add_argument(
+    '-c', 
+    '--copy_genomes',
+    action='store_true',
+    help='Copy genomes into genomes folder')
+
+
+
 ##############################################################################
 # Parse input
 ##############################################################################
@@ -195,6 +203,7 @@ target_coverage = args.target_coverage
 execute = args.execute
 
 disable_plots = args.no_plots
+copy_genomes = args.copy_genomes
 
 
 random.seed()
@@ -538,6 +547,7 @@ with open(output_meta, 'w') as outfile:
 
 output_script = output_folder + "/simulate.sh"
 read_folder = output_folder + "/reads/"
+new_genome_folder = output_folder + "/genomes/"
 distribution_output = output_folder + '/distribution.png'
 composition_output = output_folder + '/composition.tsv'
 
@@ -628,7 +638,16 @@ with open(output_script, 'w') as outfile:
     outfile.write("error_rate={}\n".format(error_rate))
     outfile.write("read_folder={}\n".format(read_folder_abs))
 
+    if copy_genomes:
+        mkdir_if_not_exists(new_genome_folder)
+    else:
+        if new_genome_folder.endswith('/'):
+            ngf = new_genome_folder[:-1]
+        outfile.write("ln -s {} {}\n".format(os.path.abspath(genome_folder), ngf))
+
     for genome, count in zip(selected_genomes, read_counts):
+        if copy_genomes:
+            outfile.write("cp {} {}\n".format(genome.path, "{}/{}_ex.fna".format(new_genome_folder, genome.genome)))
 
         outfile.write(wgsim_command.format(
             int(count),
