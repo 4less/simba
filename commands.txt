@@ -1,0 +1,1 @@
+./simba -f test_genomes/ -l test_genomes/available_genomes.txt -o test_folder/test1 -t uhgg_taxonomy.tsv -n 30 -x -v 5 --no_tree_png

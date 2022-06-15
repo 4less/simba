@@ -13,6 +13,9 @@ class Node:
         if nid != self.id:
             self.children.add(nid)
 
+    def IsLeaf(self):
+        return len(self.children) == 0
+
 class GTDB:
     def __init__(self, taxonomy_path: str):
         self.path = taxonomy_path
@@ -155,6 +158,69 @@ class GTDB:
             node = self.nodes[node.parent_id]
 
         return self.ids2name[node.id]
+
+    def RootName(self):
+        return self.ids2name[self.root]
+
+    def LeafsFromNode(self, name: str):
+        if name not in self.names2id.keys():
+            print("Unknown taxon {}".format(name))
+            exit()
+
+        leafs = []
+
+        queue = []
+
+        nid = self.names2id[name]
+        node = self.nodes[nid]
+
+        queue.append(node)
+
+        while queue:
+            cnode = queue.pop(0)
+
+            for cid in cnode.children:
+                child = self.nodes[cid]
+                if child.IsLeaf():
+                    leafs.append(self.ids2name[cid])
+                else:
+                    queue.append(self.nodes[cid])
+
+        return leafs
+
+
+    def NodesFromNode(self, name: str, level: int):
+        if name not in self.names2id.keys():
+            print("Unknown taxon {}".format(name))
+            exit()
+
+        targets = []
+
+        queue = []
+
+        nid = self.names2id[name]
+        node = self.nodes[nid]
+
+        if node.level > level: return None;
+
+        queue.append(node)
+
+        while queue:
+            cnode = queue.pop(0)
+
+            for cid in cnode.children:
+                child = self.nodes[cid]
+                if child.level == level:
+                    targets.append(self.ids2name[cid])
+                else:
+                    queue.append(self.nodes[cid])
+
+        return targets
+
+
+    def NodesAtLevel(self, level: int):
+        return self.NodesFromNode(self.ids2name[self.root], level)
+
 
     def PrintLineage(self, name):
         nid = self.names2id[name]

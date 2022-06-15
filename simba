@@ -16,6 +16,7 @@ from scipy.stats import pareto
 
 from ete3 import Tree, TreeStyle, TextFace, add_face_to_node
 from gtdb import GTDB
+from instructions import *
 
 fig, ax = plt.subplots(1, 1)
 
@@ -40,7 +41,7 @@ my_parser.add_argument(
     '-l', 
     '--genome_list', 
     type=str,
-    required=True,
+    required=False, # changed from True
     action='store',
     help='Genome list (List of genomes to pick from)')
 
@@ -52,6 +53,24 @@ my_parser.add_argument(
     required=False,
     action='store',
     help='Preselected genomes')
+
+# Instructions
+my_parser.add_argument(
+    '-i', 
+    '--instructions', 
+    type=str,
+    required=False,
+    action='store',
+    help='Instructions for how to simulate genomes')
+
+# Instructions
+my_parser.add_argument(
+    '-m', 
+    '--samples', 
+    type=int,
+    required=False,
+    action='store',
+    help='Number of samples to simulate.')
 
 # Taxonomy
 my_parser.add_argument(
@@ -137,7 +156,7 @@ my_parser.add_argument(
     '--target_coverage',
     type=float,
     action='store',
-    help='Target mean coverage.',
+    help='Target mean horizontal coverage.',
     default=5)
 
 my_parser.add_argument(
@@ -184,9 +203,11 @@ genome_folder = args.genome_folder
 taxonomy_file = args.taxonomy
 
 selected_genomes_file = args.selected_genomes
+instructions_file = args.instructions
 
 # params
 n = args.num_genomes
+m = args.samples
 
 max_genomes_per_species = args.max_genomes_per_species
 max_genomes_per_genus = args.max_genomes_per_genus
@@ -312,6 +333,11 @@ def NewickTree(genome_list):
             parent_node = node
 
     return "({});".format(BuildNewickString(root_node))
+
+
+
+def Sample(set_var):
+    random.choice(tuple(set_var))
 
 
 class Genome:
@@ -454,21 +480,49 @@ def make_executable(path):
 
 print("Select {} genomes from a pool of {} genomes.".format(n, len(genomes)))
 
+leafs = taxonomy.LeafsFromNode("g__Phocaeicola")
 
-if selected_genomes_file == None:
-    while len(selected_genomes) < n:
-        random_genome = genomes[random.randint(0,len(genomes)-1)]
+print("LENGTH: {}".format(len(leafs)))
+print(leafs)
 
-        if not is_genome_valid(random_genome):
-            continue
+nodes = taxonomy.NodesFromNode("g__Phocaeicola", 7)
 
-        selected_genomes.add(random_genome)
+print("LENGTH: {}".format(len(nodes)))
+for node in nodes:
+    print("\t{}: \t{}".format(node, len(taxonomy.LeafsFromNode(node))))
+
+
+print("Phyla:\n\t{}".format('\n\t'.join(taxonomy.NodesAtLevel(2))))
+
+
+
+if instructions_file:
+    print("Instructions")
+    instructions = Instructions(instructions_file)
+    # for genome in instructions.genomes:
+        # print(genome.ToString())
+
+    GenomeSelector.Select(instructions, taxonomy, genomes)   
+
+    for gkey, gvalue in instructions.groups.items():
+        print("{} -> {}".format(gkey, gvalue.Select()[0].ToString()))
+
+    exit("Exit")
 else:
-    with open(selected_genomes_file, 'r') as file:
-        for line in file:
-            genome = line.rstrip()
+    if selected_genomes_file == None:
+        while len(selected_genomes) < n:
+            random_genome = genomes[random.randint(0,len(genomes)-1)]
 
-            selected_genomes.add(line)
+            if not is_genome_valid(random_genome):
+                continue
+
+            selected_genomes.add(random_genome)
+    else:
+        with open(selected_genomes_file, 'r') as file:
+            for line in file:
+                genome = line.rstrip()
+
+                selected_genomes.add(line)
 
 
 
@@ -668,8 +722,4 @@ make_executable(output_script)
 if execute:
     os.system(output_script)
 
-
-
-# asd
-#########################################################
 
