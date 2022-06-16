@@ -165,7 +165,17 @@ my_parser.add_argument(
     type=float,
     action='store',
     help='Error rate for simulation',
+    default=0.001)
+
+
+my_parser.add_argument(
+    '-R', 
+    '--indel_rate',
+    type=float,
+    action='store',
+    help='Indel rate for simulation',
     default=0.0001)
+
 
 my_parser.add_argument(
     '-x', 
@@ -217,6 +227,7 @@ min_phylum_coverage = args.min_phylum_coverage
 
 # simulation params
 error_rate = args.error_rate
+indel_rate = args.indel_rate
 read_length = args.read_length
 
 target_coverage = args.target_coverage
@@ -690,7 +701,7 @@ with open(composition_output, 'w') as outfile:
 # Write to simulate script
 #########################################################
 
-wgsim_command = "wgsim -R 0 -e ${{error_rate}} -N {} -1 {} -2 {} {} {} {}\n"
+wgsim_command = "wgsim -R {{indel_rate}} -e ${{error_rate}} -N {} -1 {} -2 {} {} {} {}\n"
 cp_command = "cp {} {}\n"
 
 read1_templ = "${{read_folder}}/{}_1.fastq"
@@ -699,6 +710,7 @@ read2_templ = "${{read_folder}}/{}_2.fastq"
 with open(output_script, 'w') as outfile:
     outfile.write("#!/bin/bash\n")
     outfile.write("error_rate={}\n".format(error_rate))
+    outfile.write("indel_rate={}\n".format(indel_rate))
     outfile.write("read_folder={}\n".format(read_folder_abs))
 
     if copy_genomes:
