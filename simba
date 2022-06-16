@@ -480,34 +480,42 @@ def make_executable(path):
 
 print("Select {} genomes from a pool of {} genomes.".format(n, len(genomes)))
 
-leafs = taxonomy.LeafsFromNode("g__Phocaeicola")
+# leafs = taxonomy.LeafsFromNode("g__Phocaeicola")
 
-print("LENGTH: {}".format(len(leafs)))
-print(leafs)
+# print("LENGTH: {}".format(len(leafs)))
+# print(leafs)
 
-nodes = taxonomy.NodesFromNode("g__Phocaeicola", 7)
+# nodes = taxonomy.NodesFromNode("g__Phocaeicola", 7)
 
-print("LENGTH: {}".format(len(nodes)))
-for node in nodes:
-    print("\t{}: \t{}".format(node, len(taxonomy.LeafsFromNode(node))))
+# print("LENGTH: {}".format(len(nodes)))
+# for node in nodes:
+#     print("\t{}: \t{}".format(node, len(taxonomy.LeafsFromNode(node))))
 
 
-print("Phyla:\n\t{}".format('\n\t'.join(taxonomy.NodesAtLevel(2))))
+# print("Phyla:\n\t{}".format('\n\t'.join(taxonomy.NodesAtLevel(2))))
 
 
 
 if instructions_file:
     print("Instructions")
-    instructions = Instructions(instructions_file)
+    instructions = Instructions()
+    instructions.Load(instructions_file)
+
     # for genome in instructions.genomes:
         # print(genome.ToString())
 
-    GenomeSelector.Select(instructions, taxonomy, genomes)   
+    print("IsInit: {}".format(instructions.IsInitialized()))
+    if not instructions.IsInitialized():
+        GenomeSelector.Select(instructions, taxonomy, genomes)
+        profile_output = "{}/profile.tsv".format(output_folder)
+        instructions.WriteProfile(profile_output)
 
     for gkey, gvalue in instructions.groups.items():
-        print("{} -> {}".format(gkey, gvalue.Select()[0].ToString()))
+        genome = gvalue.Select()[0]
+        print("{} -> {}".format(gkey, genome.genome_var.GetValue()))
+        selected_genomes.add(genome.genome_var.GetValue())
 
-    exit("Exit")
+    print("selected_genomes {}".format(selected_genomes))
 else:
     if selected_genomes_file == None:
         while len(selected_genomes) < n:
@@ -605,7 +613,7 @@ new_genome_folder = output_folder + "/genomes/"
 distribution_output = output_folder + '/distribution.png'
 composition_output = output_folder + '/composition.tsv'
 
-genome_path_template = genome_folder + "/{}_ex.fna"
+genome_path_template = genome_folder + "/{}.fna"
 
 mkdir_if_not_exists(read_folder)
 read_folder_abs = os.path.abspath(read_folder)
@@ -613,7 +621,7 @@ read_folder_abs = os.path.abspath(read_folder)
 
 def g2path(genome: str):
     global genome_folder
-    genome_path_template = genome_folder + "/{}_ex.fna"
+    genome_path_template = genome_folder + "/{}.fna"
     return os.path.abspath(genome_path_template.format(genome))
 
 

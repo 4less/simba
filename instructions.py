@@ -121,6 +121,7 @@ class IGenome:
         self.lineage = lineage
         self.name = name
         self.level = -1
+        self.group = None
         #self.Load(lineage)
 
     def SetRule(self, rule, level: int):
@@ -131,6 +132,14 @@ class IGenome:
         for i in range(len(self.variables)):
             if self.variables[i]: names[i] = self.variables[i].name
             elif self.rules[i]: names[i] = self.rules[i].name
+        return ';'.join(names)
+
+
+    def OriginalString(self):
+        names = [""] * len(self.variables)
+        for i in range(len(self.variables)):
+            if self.rules[i]: names[i] = self.rules[i].name
+            elif self.variables[i]: names[i] = self.variables[i].name
         return ';'.join(names)
 
     def SetGenomeVar(self, genome_var):
@@ -208,16 +217,20 @@ class INode:
         self.children.add(child)
 
 class Group:
-    def __init__(self):
+    def __init__(self, gid):
         self.members = []
         self.select = []
+        self.select_str = None
+        self.gid = gid
 
     def AddGenome(self, genome):
         self.members.append(genome)
 
     def SetSelect(self, select_str: str):
+        self.select_str = select_str
         if select_str.isdigit():
             self.select.append(int(select_str))
+
 
     def Select(self):
         select = random.choice(tuple(self.select))
@@ -230,17 +243,17 @@ class Instructions:
     LINEAGE_COLUMN = 1
     GROUP_COLUMN = 2
     SELECT_COLUMN = 3
+    SELECTED_GENOME_COLUMN = 4
 
     GENOMES_HEADER = "#Genomes"
     VARIABLE_COLUMN = 0
     RELATIVE_ABUNDANCE_COLUMN = 1
 
-    def __init__(self, path: str):
+    def __init__(self):
         self.genomes = set()
         self.variables = dict()
         self.rules = dict()
         self.groups = dict()
-        self.Load(path)
 
         self.rolling_gid = 0
 
@@ -261,6 +274,16 @@ class Instructions:
         self.rolling_gid += 1
         return self.rolling_gid
 
+    def GetLeafRank(self):
+        return max(v.level for v in self.variables.values())
+
+    def IsInitialized(self):
+        if len(self.variables) == 0: return False
+        for var in [v for v in self.variables.values() if v.level == self.GetLeafRank()]:
+            if not var.GetValue(): return False
+
+        return True
+
     def GetVariablesOfLevel(self, level: int):
         return [var for var in self.variables.values() if var.level == level]
 
@@ -272,7 +295,7 @@ class Instructions:
 
     def AddGroup(self, group_id: int) -> Group:
         if group_id not in self.groups:
-            group = Group()
+            group = Group(group_id)
             self.groups[group_id] = group
         return self.groups[group_id]
 
@@ -287,6 +310,25 @@ class Instructions:
         if variable_str not in self.variables:
             self.variables[variable_str] = IVariable(variable_str)
         return self.variables[variable_str]
+
+    # def LoadFromProfile(self, path: str):
+    #     with open(path, 'r') as file:
+    #         for line in file:
+    #             line = line.rstrip()
+
+    #             if IsComment(line): continue
+
+    #             tokens = line.split('\t')
+
+    #             variable_name = tokens[0]
+    #             genome = tokens[0]
+    #             group_id = int(tokens[1])
+    #             select_str = tokens[2]
+                        
+    #             group = self.AddGroup(group_id)
+    #             group.AddGenome(igenome)
+    #             group.SetSelect(select_str:
+
 
     def GetEligibleChoices(self, taxonomy, genome_subset, level: int, name: str):
         genome_subset = list(genome_subset)
@@ -374,6 +416,16 @@ class Instructions:
         return eligible
 
 
+    def WriteProfile(self, profile_file: str):
+        with open(profile_file, 'w') as file:
+            file.write("{}\n".format(Instructions.GENOMES_HEADER))
+            for genome in self.genomes:
+                file.write("{}\t{}\t{}\t{}\t{}\n".format(
+                    genome.genome_var.name,
+                    genome.OriginalString(),
+                    genome.group.gid,
+                    genome.group.select_str,
+                    genome.genome_var.GetValue()))
 
 
     def ProcessGenome(self, line: str):
@@ -396,10 +448,14 @@ class Instructions:
             group_id = self.GetRollingGid()
         group = self.AddGroup(group_id)
         group.AddGenome(igenome)
+        igenome.group = group
 
         # Process group select column
         if Instructions.SELECT_COLUMN < len(tokens):
             group.SetSelect(tokens[Instructions.SELECT_COLUMN])
+        if Instructions.SELECTED_GENOME_COLUMN < len(tokens):
+            genome_var.SetValue(tokens[Instructions.SELECTED_GENOME_COLUMN])
+
 
         self.genomes.add(igenome)
 
@@ -410,8 +466,8 @@ class Instructions:
             lin = lin.split('__')[-1] if "__" in lin else lin
             variable_str, rule_str = IRule.SplitIntoVarAndRule(lin)
 
-            if variable_str or rule_str:
-                print("Variable: {}\t\t{}".format(variable_str, rule_str))
+            # if variable_str or rule_str:
+                # print("Variable: {}\t\t{}".format(variable_str, rule_str))
 
             if rule_str:
                 rule = self.AddRule(variable_str, rule_str)
@@ -437,13 +493,13 @@ class Instructions:
                 # print(line)
 
                 if Instructions.IsGenomesHeader(line): 
-                    print("genome section")
+                    # print("genome section")
                     genome_section = True
                     variable_section = False
                     expect_header = True
                     continue
                 elif Instructions.IsVariableHeader(line): 
-                    print("variable section")
+                    # print("variable section")
                     variable_section = True
                     genome_section = False
                     expect_header = True
