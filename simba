@@ -622,6 +622,7 @@ read_folder_abs = os.path.abspath(read_folder)
 def g2path(genome: str):
     global genome_folder
     genome_path_template = genome_folder + "/{}.fna"
+    print("PATH: {}".format(os.path.abspath(genome_path_template.format(genome))))
     return os.path.abspath(genome_path_template.format(genome))
 
 
