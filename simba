@@ -176,12 +176,20 @@ my_parser.add_argument(
     help='Indel rate for simulation',
     default=0.0001)
 
+my_parser.add_argument(
+    '-M', 
+    '--mutation_rate',
+    type=float,
+    action='store',
+    help='Mutation rate for simulation',
+    default=0)
+
 
 my_parser.add_argument(
     '-x', 
     '--execute',
     action='store_true',
-    help='Error rate for simulation')
+    help='Simulate reads after script.')
 
 my_parser.add_argument(
     '-P', 
@@ -228,6 +236,7 @@ min_phylum_coverage = args.min_phylum_coverage
 # simulation params
 error_rate = args.error_rate
 indel_rate = args.indel_rate
+mutation_rate = args.mutation_rate
 read_length = args.read_length
 
 target_coverage = args.target_coverage
@@ -450,7 +459,7 @@ def mkdir_if_not_exists(folder):
         os.mkdir(folder)
 
 
-def randomize_distr(distr):
+def randomize_distr(distr, alpha :int =2):
     sum_old = 0
     sum_new = 0
     for i in range(0, len(distr)):
@@ -458,7 +467,7 @@ def randomize_distr(distr):
         # weight = 3/(i+1)
         weight = 0.3 + (10/len(distr) * min(i,10))/10
         random_element = random.uniform(-1 * weight, weight)
-        distr[i] += random_element * distr[i]
+        distr[i] += abs(random_element * distr[i] * alpha)
         distr = list(distr)
         distr.sort(reverse=True)
 
@@ -645,6 +654,10 @@ selected_genomes = [ Genome(sg, g2path(sg), fasta_length(g2path(sg))) for sg in 
 
 data_points = len(selected_genomes)
 x, y = pareto_distr(data_points)
+y1 = [e[0] for e in y]
+
+print("y: {}".format(y1 ))
+print("ysum: {}".format(sum(y1 )))
 
 if not disable_plots:
     plot_distr(x, y, distribution_output)
@@ -701,7 +714,7 @@ with open(composition_output, 'w') as outfile:
 # Write to simulate script
 #########################################################
 
-wgsim_command = "wgsim -R {{indel_rate}} -e ${{error_rate}} -N {} -1 {} -2 {} {} {} {}\n"
+wgsim_command = "wgsim -R {{indel_rate}} -r {{mutation_rate}} -e ${{error_rate}} -N {} -1 {} -2 {} {} {} {}\n"
 cp_command = "cp {} {}\n"
 
 read1_templ = "${{read_folder}}/{}_1.fastq"
@@ -711,6 +724,7 @@ with open(output_script, 'w') as outfile:
     outfile.write("#!/bin/bash\n")
     outfile.write("error_rate={}\n".format(error_rate))
     outfile.write("indel_rate={}\n".format(indel_rate))
+    outfile.write("mutation_rate={}\n".format(mutation_rate))
     outfile.write("read_folder={}\n".format(read_folder_abs))
 
     if copy_genomes:
