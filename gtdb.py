@@ -222,7 +222,7 @@ class GTDB:
         return self.NodesFromNode(self.ids2name[self.root], level)
 
 
-    def PrintLineage(self, name):
+    def LineageStr(self, name):
         nid = self.names2id[name]
 
         node = self.nodes[self.nodes[nid].parent_id]
