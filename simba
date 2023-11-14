@@ -2,10 +2,13 @@
 import argparse
 import math
 import os
+import glob
 import sys
 import random
 import stat
 import subprocess
+from src.tree_node import TreeNode
+from src.genome import Genome, load_genomes
 from src.options import get_simba_argument_parser
 
 import matplotlib.pyplot as plt
@@ -18,6 +21,8 @@ from scipy.stats import pareto
 from ete3 import Tree, TreeStyle, TextFace, add_face_to_node
 from gtdb import GTDB
 from instructions import *
+
+from src.utils import *
 
 fig, ax = plt.subplots(1, 1)
 
@@ -93,6 +98,7 @@ genomes = []
 
 selected_genomes = set()
 
+
 ##############################################################################
 # Load taxonomy
 ##############################################################################
@@ -116,75 +122,15 @@ if genome_list != None:
           line = line.rstrip()
 
           genomes.append(line)
+elif genome_folder is not None:
+    genomes = load_genomes(genome_folder, genome_list)
 else:
     genomes = [genome for genome in genome2lin.keys()]
-
-
 
 
 ##############################################################################
 # Helper functions
 ##############################################################################
-
-class TreeNode:
-    def __init__(self, name):
-        self.name = name
-        self.children = set()
-
-    def AddChild(self, node):
-        self.children.add(node)
-
-
-def BuildNewickString(node: TreeNode):
-    if len(node.children) == 0:
-        return "\"{}\"".format(node.name)
-    else:
-        return "({}){}".format(
-            ','.join([BuildNewickString(child) for child in node.children]),
-            "\"{}\"".format(node.name))
-
-
-def NewickTree(genome_list):
-    global lines
-    lines = []
-
-    root_node = TreeNode("r__Root")
-    tree_nodes["r__Root"] = root_node
-
-    lineage = ""
-    node = None
-
-
-    for genome in genome_list:
-        lineage = taxonomy.PrintLineage(genome)
-
-        tokens = lineage.split(';')
-
-        node = None
-        parent_node = root_node
-        for taxon in tokens:
-            if taxon not in tree_nodes:
-                tree_nodes[taxon] = TreeNode(taxon)
-
-            node = tree_nodes[taxon]
-
-            parent_node.AddChild(node)
-            parent_node = node
-
-    return "({});".format(BuildNewickString(root_node))
-
-
-
-def Sample(set_var):
-    random.choice(tuple(set_var))
-
-
-class Genome:
-    def __init__(self, genome, path, size):
-        self.genome = genome
-        self.path = path
-        self.size = size
-
 
 def register(genome: str):
     species = taxonomy.GetAt(genome, 's')
@@ -211,7 +157,7 @@ def register(genome: str):
     else:
         families_counter[family] = 1
 
-def is_genome_valid(genome: str):
+def is_genome_valid(genome: str, taxonomy):
     species = taxonomy.GetAt(genome, 's')
     genus = taxonomy.GetAt(genome, 'g')
     family = taxonomy.GetAt(genome, 'f')
@@ -221,7 +167,6 @@ def is_genome_valid(genome: str):
     if len(phyla) < min_phylum_coverage:
         if phylum in phyla:
             return False
-
 
 
     if species in species_counter and species_counter[species] >= max_genomes_per_species:
@@ -236,78 +181,6 @@ def is_genome_valid(genome: str):
     return True
 
 
-
-
-def fasta_length(path: str):
-    length = 0
-    with open(path, 'r') as file:
-        for line in file:
-            line = line.rstrip()
-            
-            if not line.startswith('>'):
-                length += len(line)
-    return length
-
-def read_count(rel_abundance: float, read_length: int, genome_length: int):
-    return (genome_length * rel_abundance) / read_length
-
-def vertical_coverage(read_count: int, read_length: int, genome_length: int):
-    return read_count * read_length / genome_length
-
-def upscale_read_count(read_counts, total_reads: int):
-    read_counts_sum = sum(read_counts)
-    factor: float =  total_reads / read_counts_sum
-    return [factor*count for count in read_counts]
-
-
-def pareto_distr(data_points: int):
-    a = 0.15 
-    x_m = 1
-    samples = np.linspace(start=0, stop=data_points+1, num=data_points+1)
-    output = np.array([pareto.pdf(x=samples, b=a, loc=0, scale=x_m)])
-
-    values = randomize_distr(output.T[1:])
-    scale = 1 / sum(values)
-    values = [scale * val for val in values]
-
-    return range(0, data_points), values
-
-
-def mkdir_if_not_exists(folder):
-    if not os.path.exists(folder):
-        os.mkdir(folder)
-
-
-def randomize_distr(distr, alpha :int =2):
-    sum_old = 0
-    sum_new = 0
-    for i in range(0, len(distr)):
-        # weight = 1 / (i/2+1)
-        # weight = 3/(i+1)
-        weight = 0.3 + (10/len(distr) * min(i,10))/10
-        random_element = random.uniform(-1 * weight, weight)
-        distr[i] += abs(random_element * distr[i] * alpha)
-        distr = list(distr)
-        distr.sort(reverse=True)
-
-    return distr
-
-
-def plot_distr(x, y, output: str):
-    plt.plot(x, y, label='randomized')
-    plt.xlabel('samples', fontsize=15)
-    plt.ylabel('PDF', fontsize=15)
-    plt.title('Distribution', fontsize=15)
-    plt.grid(b=True, color='grey', alpha=0.3, linestyle='-.', linewidth=2)
-    plt.rcParams["figure.figsize"] = [5, 5]
-    plt.legend(loc='best')
-    plt.savefig(output)
-
-def make_executable(path):
-    mode = os.stat(path).st_mode
-    mode |= (mode & 0o444) >> 2    # copy R bits to X
-    os.chmod(path, mode)
-
 ##############################################################################
 # Run simulation script
 ##############################################################################
@@ -318,21 +191,6 @@ def make_executable(path):
 ##########################################
 
 print("Select {} genomes from a pool of {} genomes.".format(n, len(genomes)))
-
-# leafs = taxonomy.LeafsFromNode("g__Phocaeicola")
-
-# print("LENGTH: {}".format(len(leafs)))
-# print(leafs)
-
-# nodes = taxonomy.NodesFromNode("g__Phocaeicola", 7)
-
-# print("LENGTH: {}".format(len(nodes)))
-# for node in nodes:
-#     print("\t{}: \t{}".format(node, len(taxonomy.LeafsFromNode(node))))
-
-
-# print("Phyla:\n\t{}".format('\n\t'.join(taxonomy.NodesAtLevel(2))))
-
 
 
 if instructions_file:
@@ -357,11 +215,13 @@ if instructions_file:
     print("selected_genomes {}".format(selected_genomes))
 else:
     if selected_genomes_file == None:
+        print(genomes)
+        print(len(genomes))
         while len(selected_genomes) < n:
             random_genome = genomes[random.randint(0,len(genomes)-1)]
 
-            if not is_genome_valid(random_genome):
-                continue
+            # if not is_genome_valid(random_genome):
+            #     continue
 
             selected_genomes.add(random_genome)
     else:
@@ -371,6 +231,9 @@ else:
 
                 selected_genomes.add(line)
 
+print(f"Selected genomes: {len(selected_genomes)} {selected_genomes}")
+print('\n'.join([g.to_string() for g in selected_genomes]))
+exit(9)
 
 
 # Output genome selection stats
@@ -390,7 +253,7 @@ with open(output_selected_genomes, 'w') as outfile:
         outfile.write(genome)
         outfile.write('\n')
 
-nwk = NewickTree(selected_genomes)
+nwk = NewickTree(selected_genomes, taxonomy, tree_nodes)
 
 with open(output_tree, 'w') as outfile:
     outfile.write(nwk)

@@ -1,0 +1,61 @@
+#!/usr/bin/env python
+import argparse
+import math
+import os
+import glob
+import sys
+import random
+import stat
+import subprocess
+from ete3 import Tree
+
+from src.profile_generator import ProfileGenerator
+from src.selector import Selector
+from src.tree_node import TreeNode
+from src.genome import Genome, load_genomes
+from src.options import get_simba_argument_parser, get_simba_refactor_argument_parser, Args
+from src.genome_resource import GenomeResource, Rank
+from src.utils import mkdir_if_not_exists
+
+## Parse args
+parser = get_simba_refactor_argument_parser()
+args = parser.parse_args()
+
+# general
+output_folder = getattr(args, Args.OUTPUT_FOLDER)
+
+# within sample params
+conspecific = getattr(args, Args.CONSPECIFIC)
+species_number = getattr(args, Args.SPECIES_NUMBER)
+
+# between sample params
+sample_number = getattr(args, Args.SAMPLES)
+shared_species_number_total = getattr(args, Args.SHARED_SPECIES_NUMBER_TOTAL)
+
+
+# IO
+gr = GenomeResource(getattr(args, Args.GENOME_MAP))
+
+
+# Select
+if not gr.has_x_of_rank(species_number, Rank.Species):
+    print("Not enough species in the genome map")
+    exit(9)
+
+
+# Generate 
+for s in range(sample_number):
+    print("Sample {}".format(s))
+    sample_folder = "sample_{}".format(s)
+    
+    # Select species
+    selected_species = Selector.select_species(gr, -1, predicate=lambda x: not x.r_species.startswith('s__GUT'))
+    selected_genomes = Selector.select_genomes_for_species(gr, selected_species)
+    genomes, vcovs = ProfileGenerator.generate_vertical_coverage(selected_genomes, 0.2, 70)
+    
+    sample_output_folder = "{}/{}".format(output_folder, sample_folder)
+    mkdir_if_not_exists(sample_output_folder)
+    ProfileGenerator.generate(sample_output_folder, genomes, vcovs)
+    
+    
+    

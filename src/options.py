@@ -185,3 +185,86 @@ def get_simba_argument_parser():
         help='Copy genomes into genomes folder')
     
     return my_parser
+
+# ParserArguments
+class Args:
+    GENOME_MAP = 'genomes_map'
+    CONSPECIFIC = 'conspecific'
+    SAMPLES = 'samples'
+    SPECIES_NUMBER = 'species_number'
+    SHARED_SPECIES_NUMBER_TOTAL = 'shared_species_number_total'
+    SHARED_SPECIES_NUMBER_PAIRWISE = 'shared_species_number_pairwise'
+    TREE = 'tree'
+    OUTPUT_FOLDER = 'output_folder'
+
+
+def get_simba_refactor_argument_parser():
+    my_parser = argparse.ArgumentParser(description='Select random genomes')
+
+    ##############################################################################
+    # I/O
+    ##############################################################################
+
+    # Genome list
+    my_parser.add_argument(
+        '-g',
+        f"--{Args.GENOME_MAP}",
+        type=str,
+        required=False, # changed from True
+        action='store',
+        help='tab-delimited file containing genome id, genome path and taxonomy for each genome. (--genomes_map_help for more information)')
+
+    my_parser.add_argument(
+        f"--{Args.TREE}",
+        type=str,
+        required=False, # changed from True
+        action='store',
+        help='Supply tree to get more information per sample.')
+
+    my_parser.add_argument(
+        f"--{Args.OUTPUT_FOLDER}",
+        type=str,
+        required=False, # changed from True
+        action='store',
+        help='Supply tree to get more information per sample.')
+
+    ##############################################################################
+    # Within sample parameters
+    ##############################################################################
+
+    my_parser.add_argument(f"--{Args.CONSPECIFIC}",
+                           action='store_true',
+                           help='Enable having conspecific strains in a sample')
+
+
+    my_parser.add_argument(f"--{Args.SPECIES_NUMBER}",
+                           type=int,
+                           default=1,
+                           action='store',
+                           help='Number of different species in a sample')
+
+    ##############################################################################
+    # Between sample parameters
+    ##############################################################################
+
+    my_parser.add_argument(f"--{Args.SAMPLES}",
+                           type=int,
+                           default=1,
+                           action='store',
+                           help='Number of samples')
+
+    my_parser.add_argument(f"--{Args.SHARED_SPECIES_NUMBER_TOTAL}",
+                           type=int,
+                           default=None,
+                           action='store',
+                           help='Number of different species in a sample')
+
+    my_parser.add_argument(f"--{Args.SHARED_SPECIES_NUMBER_PAIRWISE}",
+                           type=int,
+                           default=None,
+                           action='store',
+                           help='Number of different species in a sample')
+
+
+    return my_parser
+
