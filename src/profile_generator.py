@@ -66,7 +66,7 @@ class ProfileGenerator:
         
 
     @staticmethod
-    def write_simulate_reads_script(output, simulation_output, genomes, coverages):
+    def write_simulate_reads_script(output, simulation_output, genomes, coverages, sample_id, gzip=False):
         output.write('#!/bin/bash\n\n')
         
         genomes = list(genomes)
@@ -83,11 +83,35 @@ class ProfileGenerator:
         SIMULATION_OUTPUT="OUTPUT_FOLDER"
         output.write("{}={}\n".format(SIMULATION_OUTPUT, simulation_output))
         
+        read_list_fwd = []
+        read_list_rev = []
+
         for genome, coverage in zip(genomes, coverages):
             shortened_path = genome.path.replace(lcpath, "") if len(lcpath) > 0 else genome.path
-            shell_command = Simulator.get_art_illumina("${{{}}}/{}".format(VARIABLE_STRING, shortened_path), "${{{}}}/{}".format(SIMULATION_OUTPUT, genome.id), True, 150, coverage)
+            shell_command, read_fwd, read_rev = Simulator.get_art_illumina("${{{}}}/{}".format(VARIABLE_STRING, shortened_path), "${{{}}}/{}".format(SIMULATION_OUTPUT, genome.id), True, 150, coverage)
+
+            read_list_fwd.append(read_fwd)
+            read_list_rev.append(read_rev)
+
             output.write(' '.join(map(str, shell_command)))
             output.write('\n')
+
+        read_fwd_out = "{}_1.fq".format(sample_id)
+        read_rev_out = "{}_2.fq".format(sample_id)
+
+        output.write("cat {} > {}\n".format(' '.join(read_list_fwd), read_fwd_out))
+        output.write("cat {} > {}\n".format(' '.join(read_list_rev), read_rev_out))
+
+        if gzip:
+            output.write("gzip {}\n".format(' '.join(read_list_fwd)))
+            output.write("gzip {}\n".format(' '.join(read_list_rev)))
+            output.write("gzip {}\n".format(read_fwd_out))
+            output.write("gzip {}\n".format(read_rev_out))
+
+        output.write('\n')
+
+
+
 
     @staticmethod
     def write_profile(output, genomes, coverages, delimiter='\t'):
@@ -95,15 +119,14 @@ class ProfileGenerator:
             output.write(f"{genome.id}{delimiter}{genome.lineage_string()}{delimiter}{coverage}\n")
             
     @staticmethod
-    def generate(output_folder, genomes, vcovs):
-        simulate_shell_script = output_folder + '/simulate_sample.sh'
+    def generate(output_folder, simulate_shell_script, genomes, vcovs, sample_id):
         gold_standard_profile = output_folder + '/gold_standard_profile.tsv'
         
         read_output_path = "{}/{}/".format(output_folder, "reads")
         mkdir_if_not_exists(read_output_path)
         
         with open(simulate_shell_script, 'w') as output:
-            ProfileGenerator.write_simulate_reads_script(output, read_output_path, genomes, vcovs)
+            ProfileGenerator.write_simulate_reads_script(output, read_output_path, genomes, vcovs, sample_id, gzip=True)
         make_executable(simulate_shell_script)
 
         with open(gold_standard_profile, 'w') as output:

@@ -23,6 +23,9 @@ args = parser.parse_args()
 
 # general
 output_folder = getattr(args, Args.OUTPUT_FOLDER)
+output_folder_scripts = getattr(args, Args.OUTPUT_FOLDER_SCRIPTS)
+
+mkdir_if_not_exists(output_folder_scripts)
 
 # within sample params
 conspecific = getattr(args, Args.CONSPECIFIC)
@@ -36,7 +39,6 @@ shared_species_number_total = getattr(args, Args.SHARED_SPECIES_NUMBER_TOTAL)
 # IO
 gr = GenomeResource(getattr(args, Args.GENOME_MAP))
 
-
 # Select
 if not gr.has_x_of_rank(species_number, Rank.Species):
     print("Not enough species in the genome map")
@@ -47,6 +49,7 @@ if not gr.has_x_of_rank(species_number, Rank.Species):
 for s in range(sample_number):
     print("Sample {}".format(s))
     sample_folder = "sample_{}".format(s)
+    sample_shell_script = "{}/sample_{}.sh".format(output_folder_scripts, s)
     
     # Select species
     selected_species = Selector.select_species(gr, -1, predicate=lambda x: not x.r_species.startswith('s__GUT'))
@@ -55,7 +58,7 @@ for s in range(sample_number):
     
     sample_output_folder = "{}/{}".format(output_folder, sample_folder)
     mkdir_if_not_exists(sample_output_folder)
-    ProfileGenerator.generate(sample_output_folder, genomes, vcovs)
+    ProfileGenerator.generate(sample_output_folder, sample_shell_script, genomes, vcovs, "sample_{}".format(s))
     
     
     

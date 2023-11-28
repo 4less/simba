@@ -196,6 +196,7 @@ class Args:
     SHARED_SPECIES_NUMBER_PAIRWISE = 'shared_species_number_pairwise'
     TREE = 'tree'
     OUTPUT_FOLDER = 'output_folder'
+    OUTPUT_FOLDER_SCRIPTS = "script_folder"
 
 
 def get_simba_refactor_argument_parser():
@@ -227,6 +228,13 @@ def get_simba_refactor_argument_parser():
         required=False, # changed from True
         action='store',
         help='Supply tree to get more information per sample.')
+
+    my_parser.add_argument(
+        f"--{Args.OUTPUT_FOLDER_SCRIPTS}",
+        type=str,
+        required=False, # changed from True
+        action='store',
+        help='Output folder to store the scripts to simulate the sample.')
 
     ##############################################################################
     # Within sample parameters
