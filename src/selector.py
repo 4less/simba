@@ -1,6 +1,6 @@
 import os
 import random
-from genome_resource import GenomeResource, Rank
+from src.genome_resource import GenomeResource, Rank
 
 class Selector:
     @staticmethod

@@ -12,7 +12,7 @@ class Simulator:
         result.append("-i")
         result.append(genome)
         result.append("-o")
-        result.append(output_prefix)
+        result.append(output_prefix + "_")
         result.append("-l")
         result.append(read_length)
         result.append("-ss")
@@ -24,8 +24,8 @@ class Simulator:
         result.append("-s")
         result.append(stddev_insert)
         
-        read1 = "{}_1.fq".format(output_prefix)
-        read2 = "{}_2.fq".format(output_prefix)
+        read1 = "{}1.fq".format(output_prefix)
+        read2 = "{}2.fq".format(output_prefix)
 
         return result, read1, read2
     
