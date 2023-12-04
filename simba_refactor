@@ -58,7 +58,8 @@ for s in range(sample_number):
     
     sample_output_folder = "{}/{}".format(output_folder, sample_folder)
     mkdir_if_not_exists(sample_output_folder)
-    ProfileGenerator.generate(sample_output_folder, sample_shell_script, genomes, vcovs, "sample_{}".format(s))
+    ProfileGenerator.generate_scripts(sample_output_folder, sample_shell_script, genomes, vcovs, "sample_{}".format(s))
+    print("Script file: {}".format(sample_shell_script))
     
     
     

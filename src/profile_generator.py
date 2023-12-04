@@ -69,6 +69,9 @@ class ProfileGenerator:
     def write_simulate_reads_script(output, simulation_output, genomes, coverages, sample_id, gzip=False):
         output.write('#!/bin/bash\n\n')
         
+        output.write('SCRIPT_DIR=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )\n')
+        output.write('cd $SCRIPT_DIR\n\n')
+
         genomes = list(genomes)
         
         paths = [g.path for g in genomes]
@@ -78,7 +81,6 @@ class ProfileGenerator:
         
         VARIABLE_STRING="PATH_PREFIX"
         output.write("{}={}\n".format(VARIABLE_STRING, lcpath))
-        
         
         SIMULATION_OUTPUT="OUTPUT_FOLDER"
         output.write("{}={}\n".format(SIMULATION_OUTPUT, simulation_output))
@@ -119,7 +121,7 @@ class ProfileGenerator:
             output.write(f"{genome.id}{delimiter}{genome.lineage_string()}{delimiter}{coverage}\n")
             
     @staticmethod
-    def generate(output_folder, simulate_shell_script, genomes, vcovs, sample_id):
+    def generate_scripts(output_folder, simulate_shell_script, genomes, vcovs, sample_id):
         gold_standard_profile = output_folder + '/gold_standard_profile.tsv'
         
         read_output_path = "{}/{}/".format(output_folder, "reads")
