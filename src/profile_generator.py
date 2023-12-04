@@ -155,8 +155,10 @@ class ProfileGenerator:
 
     @staticmethod
     def write_profile(output, genomes, coverages, delimiter='\t'):
+        total_coverage = sum(coverages)
         for genome, coverage in zip(genomes, coverages):
-            output.write(f"{genome.id}{delimiter}{genome.lineage_string()}{delimiter}{coverage}\n")
+            abundance = coverage / total_coverage
+            output.write(f"{genome.id}{delimiter}{genome.lineage_string()}{delimiter}{coverage}{delimiter}{abundance}\n")
             
     @staticmethod
     def generate_scripts(output_folder, simulate_shell_script, genomes, vcovs, sample_id):
