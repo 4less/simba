@@ -54,7 +54,28 @@ def scale_counts(counts, min_vcov, max_vcov):
 
 class ProfileGenerator:
     @staticmethod
-    def generate_vertical_coverage(genomes, min_vcov, max_vcov):
+    def generate_vertical_coverage(genomes, min_vcov, max_vcov, method="pareto"):
+        """Generates vertical coverages for genomes
+
+        Parameters
+        ----------
+        genomes : str
+            The file location of the spreadsheet
+        min_vcov : float
+            A flag used to print the columns to the console (default is
+            False)
+        max_vcov : float
+            A flag used to print the columns to the console (default is
+            False)
+        method : str
+            Different methods for generating vertical coverage
+
+        Returns
+        -------
+        list
+            a list of strings used that are the header columns
+        """
+
         genomes = list(genomes)
         m = len(genomes)
         
@@ -66,7 +87,7 @@ class ProfileGenerator:
         
 
     @staticmethod
-    def write_simulate_reads_script(output, simulation_output, genomes, coverages, sample_id, gzip=False):
+    def write_simulate_reads_script(output, joint_read_output_folder, simulation_output_folder, genomes, coverages, sample_id, gzip=False):
         output.write('#!/bin/bash\n\n')
         
         # output.write('SCRIPT_DIR=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )\n')
@@ -82,8 +103,11 @@ class ProfileGenerator:
         VARIABLE_STRING="PATH_PREFIX"
         output.write("{}={}\n".format(VARIABLE_STRING, lcpath))
         
-        SIMULATION_OUTPUT="OUTPUT_FOLDER"
-        output.write("{}={}\n".format(SIMULATION_OUTPUT, simulation_output))
+        SIMULATION_OUTPUT="READ_OUTPUT_FOLDER"
+        output.write("{}={}\n".format(SIMULATION_OUTPUT, simulation_output_folder))
+
+        SIMULATION_OUTPUT_JOINT="JOINT_READ_OUTPUT_FOLDER"
+        output.write("{}={}\n".format(SIMULATION_OUTPUT_JOINT, joint_read_output_folder))
         
         read_list_fwd = []
         read_list_rev = []
@@ -108,8 +132,8 @@ class ProfileGenerator:
             # zip genome again
             output.write("gzip {}\n".format(genome_str_unzip))
 
-        read_fwd_out = "${{{}}}/{}_1.fq".format(SIMULATION_OUTPUT, sample_id)
-        read_rev_out = "${{{}}}/{}_2.fq".format(SIMULATION_OUTPUT, sample_id)
+        read_fwd_out = "${{{}}}/{}_1.fq".format(SIMULATION_OUTPUT_JOINT, sample_id)
+        read_rev_out = "${{{}}}/{}_2.fq".format(SIMULATION_OUTPUT_JOINT, sample_id)
 
         output.write("cat {} > {}\n".format(' '.join(read_list_fwd), read_fwd_out))
         output.write("cat {} > {}\n".format(' '.join(read_list_rev), read_rev_out))
@@ -134,14 +158,16 @@ class ProfileGenerator:
     def generate_scripts(output_folder, simulate_shell_script, genomes, vcovs, sample_id):
         gold_standard_profile = output_folder + '/gold_standard_profile.tsv'
         
-        read_output_path = "{}/{}/".format(output_folder, "reads")
-        mkdir_if_not_exists(output_folder)
-        mkdir_if_not_exists(read_output_path)
+        single_read_output_folder = "{}/{}/".format(output_folder, "reads")
 
-        read_output_path = os.path.abspath(read_output_path)
+        mkdir_if_not_exists(output_folder)
+        mkdir_if_not_exists(single_read_output_folder)
+
+        single_read_output_folder_abs = os.path.abspath(single_read_output_folder)
+        joint_read_output_folder_abs = os.path.abspath(output_folder)
 
         with open(simulate_shell_script, 'w') as output:
-            ProfileGenerator.write_simulate_reads_script(output, read_output_path, genomes, vcovs, sample_id, gzip=True)
+            ProfileGenerator.write_simulate_reads_script(output, joint_read_output_folder_abs, single_read_output_folder_abs, genomes, vcovs, sample_id, gzip=True)
         make_executable(simulate_shell_script)
 
         with open(gold_standard_profile, 'w') as output:
