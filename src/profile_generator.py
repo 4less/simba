@@ -109,6 +109,10 @@ class ProfileGenerator:
         SIMULATION_OUTPUT_JOINT="JOINT_READ_OUTPUT_FOLDER"
         output.write("{}={}\n".format(SIMULATION_OUTPUT_JOINT, joint_read_output_folder))
         
+        
+        output.write("mkdir -p {}\n".format(SIMULATION_OUTPUT))
+        output.write("mkdir -p {}\n".format(SIMULATION_OUTPUT_JOINT))
+
         read_list_fwd = []
         read_list_rev = []
 
