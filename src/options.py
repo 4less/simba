@@ -249,7 +249,7 @@ def get_simba_refactor_argument_parser():
                            type=int,
                            default=1,
                            action='store',
-                           help='Number of different species in a sample')
+                           help='Number of different species in a sample. 0 for all available.')
 
     ##############################################################################
     # Between sample parameters

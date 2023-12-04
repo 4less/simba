@@ -52,7 +52,7 @@ for s in range(sample_number):
     sample_shell_script = "{}/sample_{}.sh".format(output_folder_scripts, s)
     
     # Select species
-    selected_species = Selector.select_species(gr, -1, predicate=lambda x: not x.r_species.startswith('s__GUT'))
+    selected_species = Selector.select_species(gr, species_number, predicate=lambda x: not x.r_species.startswith('s__GUT'))
     selected_genomes = Selector.select_genomes_for_species(gr, selected_species)
     genomes, vcovs = ProfileGenerator.generate_vertical_coverage(selected_genomes, 0.2, 70)
     
