@@ -5,3 +5,7 @@ uhgg_taxonomy_clean.tsv
 commands.txt
 uhgg_taxonomy.tsv
 uhgg_taxonomy_clean.tsv
+*.pyc
+uhgg_taxonomy.tsv
+src/__pycache__
+tobiom.py

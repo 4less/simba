@@ -24,8 +24,8 @@ class Simulator:
         result.append("-s")
         result.append(stddev_insert)
         
-        read1 = "{}1.fq".format(output_prefix)
-        read2 = "{}2.fq".format(output_prefix)
+        read1 = "{}_1.fq".format(output_prefix)
+        read2 = "{}_2.fq".format(output_prefix)
 
         return result, read1, read2
     

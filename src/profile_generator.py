@@ -98,8 +98,8 @@ class ProfileGenerator:
             output.write(' '.join(map(str, shell_command)))
             output.write('\n')
 
-        read_fwd_out = "{}_1.fq".format(sample_id)
-        read_rev_out = "{}_2.fq".format(sample_id)
+        read_fwd_out = "${{{}}}/{}_1.fq".format(SIMULATION_OUTPUT, sample_id)
+        read_rev_out = "${{{}}}/{}_2.fq".format(SIMULATION_OUTPUT, sample_id)
 
         output.write("cat {} > {}\n".format(' '.join(read_list_fwd), read_fwd_out))
         output.write("cat {} > {}\n".format(' '.join(read_list_rev), read_rev_out))
