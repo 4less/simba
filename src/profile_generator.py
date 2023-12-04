@@ -89,14 +89,24 @@ class ProfileGenerator:
         read_list_rev = []
 
         for genome, coverage in zip(genomes, coverages):
-            shortened_path = genome.path.replace(lcpath, "") if len(lcpath) > 0 else genome.path
-            shell_command, read_fwd, read_rev = Simulator.get_art_illumina("${{{}}}/{}".format(VARIABLE_STRING, shortened_path), "${{{}}}/{}".format(SIMULATION_OUTPUT, genome.id), True, 150, coverage)
+            shortened_genome_path = genome.path.replace(lcpath, "") if len(lcpath) > 0 else genome.path
+            genome_str_zip = "${{{}}}/{}".format(VARIABLE_STRING, shortened_genome_path)
+            genome_str_unzip = "${{{}}}/{}".format(VARIABLE_STRING, shortened_genome_path).replace('.gz', '')
+
+            shell_command, read_fwd, read_rev = Simulator.get_art_illumina(genome_str_unzip, "${{{}}}/{}".format(SIMULATION_OUTPUT, genome.id), True, 150, coverage)
 
             read_list_fwd.append(read_fwd)
             read_list_rev.append(read_rev)
 
+
+            # unzip genome
+            output.write("gunzip {}\n".format(genome_str_zip))
+
             output.write(' '.join(map(str, shell_command)))
             output.write('\n')
+
+            # zip genome again
+            output.write("gzip {}\n".format(genome_str_unzip))
 
         read_fwd_out = "${{{}}}/{}_1.fq".format(SIMULATION_OUTPUT, sample_id)
         read_rev_out = "${{{}}}/{}_2.fq".format(SIMULATION_OUTPUT, sample_id)
