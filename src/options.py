@@ -241,9 +241,10 @@ def get_simba_refactor_argument_parser():
     ##############################################################################
 
     my_parser.add_argument(f"--{Args.CONSPECIFIC}",
-                           action='store_true',
-                           help='Enable having conspecific strains in a sample')
-
+                           type=int,
+                           default=1,
+                           action='store',
+                           help='Max conspecific strains in a sample. Lowest is 1 and means there are no conspecific strains in a sample.')
 
     my_parser.add_argument(f"--{Args.SPECIES_NUMBER}",
                            type=int,

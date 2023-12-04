@@ -76,11 +76,11 @@ class ProfileGenerator:
         lcpath = keep_only_folder(lcp)
         lcpath = lcpath + '/' if len(lcpath) > 0 else ""
         
-        VARIABLE_STRING="PATH_PREFIX"
+        VARIABLE_STRING = "PATH_PREFIX"
         output.write("{}={}\n".format(VARIABLE_STRING, lcpath))
         
-        
-        SIMULATION_OUTPUT="OUTPUT_FOLDER"
+        SIMULATION_OUTPUT = "OUTPUT_FOLDER"
+        mkdir_if_not_exists(simulation_output)
         output.write("{}={}\n".format(SIMULATION_OUTPUT, simulation_output))
         
         read_list_fwd = []

@@ -10,6 +10,7 @@ import subprocess
 from ete3 import Tree
 
 from src.profile_generator import ProfileGenerator
+from src.rules import SpecificRule
 from src.selector import Selector
 from src.tree_node import TreeNode
 from src.genome import Genome, load_genomes
@@ -43,6 +44,31 @@ gr = GenomeResource(getattr(args, Args.GENOME_MAP))
 if not gr.has_x_of_rank(species_number, Rank.Species):
     print("Not enough species in the genome map")
     exit(9)
+
+
+rule = SpecificRule()
+rule.name = "Get Escherichia"
+rule.taxon = "g__Escherichia"
+rule.species_min = 1
+rule.species_max = 4
+rule.species_total_genomes_min = 5
+rule.species_total_genomes_max = 2000
+
+# across samples
+rule.species_total_genomes_min = 2
+rule.species_total_genomes_max = 2
+
+# within sample
+rule.species_conspecific_min = 1
+rule.species_conspecific_max = 2
+
+rule.prevalence_across_samples = 1
+
+print("apply")
+rule.apply(gr, sample_number)
+
+exit(9)
+
 
 
 # Generate 

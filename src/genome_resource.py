@@ -18,6 +18,7 @@ class Genome:
         self.r_genus = r_genus
         self.r_species = r_species
 
+
     @staticmethod
     def from_lineage_string(gid, path, lineage):
         tokens = lineage.split(';')
@@ -27,6 +28,9 @@ class Genome:
 
     def lineage_string(self):
         return ';'.join([getattr(self, f) for f in self.RANK_FIELDS])
+
+    def match(self, taxon):
+        return any(t == taxon for t in [getattr(self, f) for f in self.RANK_FIELDS])
 
     def to_string(self):
         return "{}\t{}".format(self.id, self.lineage_string())
