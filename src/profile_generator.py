@@ -9,6 +9,7 @@ import random
 
 from src.simulator_wrappers import Simulator
 from src.utils import make_executable, longest_common_prefix, keep_only_folder, mkdir_if_not_exists
+from src.genome_resource import Genome
 
 
 def randomize_distr(distr, alpha: int = 2):
@@ -154,17 +155,23 @@ class ProfileGenerator:
 
 
     @staticmethod
-    def write_profile(output, genomes, coverages, delimiter='\t'):
+    def write_profile(output, genomes: set[Genome], coverages, delimiter='\t'):
         total_coverage = sum(coverages)
         for genome, coverage in zip(genomes, coverages):
             abundance = coverage / total_coverage
-            output.write(f"{genome.id}{delimiter}{genome.lineage_string()}{delimiter}{coverage}{delimiter}{abundance}\n")
+            output.write('\t'.join(map(str, [
+                genome.id,
+                genome.lineage_string(),
+                coverage,
+                abundance,
+                genome.path
+            ])))
+            output.write('\n')
             
     @staticmethod
     def generate_scripts(output_folder, simulate_shell_script, genomes, vcovs, sample_id):
-        gold_standard_profile = output_folder + '/gold_standard_profile.tsv'
         
-        single_read_output_folder = "{}/{}/".format(output_folder, "reads")
+        single_read_output_folder = "{}/{}/".format(output_folder, "single_reads")
 
         mkdir_if_not_exists(output_folder)
         mkdir_if_not_exists(single_read_output_folder)
@@ -176,6 +183,50 @@ class ProfileGenerator:
             ProfileGenerator.write_simulate_reads_script(output, joint_read_output_folder_abs, single_read_output_folder_abs, genomes, vcovs, sample_id, gzip=True)
         make_executable(simulate_shell_script)
 
-        with open(gold_standard_profile, 'w') as output:
-            ProfileGenerator.write_profile(output, genomes, vcovs)
+    @staticmethod
+    def generate_roary_scripts(output_folder, script_folder, species_to_genomes):
+        prokka_out = "{}/{}".format(output_folder, "prokka")
+        roary_out = "{}/{}".format(output_folder, "roary")
+
+        mkdir_if_not_exists(prokka_out)
+        mkdir_if_not_exists(roary_out)
+
+        for species, genomes in species_to_genomes.items():
+            species_name = species.replace(' ', '_')
+            species_script = "{}/{}.sh".format(script_folder, species_name)
+            print(species_script)
+
+            with open(species_script, 'w') as out:
+                out.write('#!/bin/bash\n')
+                out.write("""
+GENOMES=\"{}\"
+PROKKA_FOLDER={}
+ROARY_FOLDER={}
+
+mkdir -p $PROKKA_FOLDER
+mkdir -p $ROARY_FOLDER
+
+for GENOME in GENOMES; do
+	#GENOME=$(echo $line | cut -f2 -d' ')
+	GENOME_UNZIP=$(echo $GENOME | sed 's/\.gz//')
+    PREFIX=$(basename $GENOME_UNZIP | sed 's/\.fna//')
+
+    echo "gunzip $GENOME"
+    echo "srun prokka --outdir $PROKKA_FOLDER --prefix $PREFIX --cpus 16 --force $GENOME_UNZIP"
+    echo "gzip $GENOME_UNZIP"
+
+    gunzip $GENOME
+	prokka --outdir $PROKKA_FOLDER --prefix $PREFIX --cpus 16 --force $GENOME_UNZIP
+    gzip $GENOME_UNZIP
+done
+
+roary -e --mafft -p 16 ${{PROKKA_FOLDER}}/*.gff -f ${{ROARY_FOLDER}}
+ln -s ${{ROARY_FOLDER}}/*/core_gene_alignment.aln ${{ROARY_FOLDER}}
+""".format(' '.join(map(lambda x: x.path, genomes)), prokka_out, roary_out))
+
+    @staticmethod
+    def generate_benchpro_scripts():
+        print("roar")
+
+
             

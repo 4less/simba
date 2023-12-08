@@ -12,9 +12,9 @@ from ete3 import Tree
 from src.profile_generator import ProfileGenerator
 from src.selector import Selector
 from src.tree_node import TreeNode
-from src.genome import Genome, load_genomes
+# from src.genome import Genome, load_genomes
 from src.options import get_simba_argument_parser, get_simba_refactor_argument_parser, Args
-from src.genome_resource import GenomeResource, Rank
+from src.genome_resource import GenomeResource, Rank, Genome
 from src.utils import mkdir_if_not_exists
 
 ## Parse args
@@ -45,21 +45,57 @@ if not gr.has_x_of_rank(species_number, Rank.Species):
     exit(9)
 
 
+def add_genomes_to_species_dict(species_dict, genomes):
+    print("Add")
+    for genome in genomes:
+        species = genome.r_species
+
+        if species not in species_dict:
+            species_dict[species] = set()
+        species_dict[species].add(genome)
+
+genomes_per_species = dict()
+
+samples_output_folder = os.path.join(output_folder, "samples")
+profile_output_folder = os.path.join(output_folder, "gold_profiles")
+roary_output_folder = os.path.join(output_folder, "roary_output")
+sim_script_output_folder = os.path.join(output_folder_scripts, "read_simulation")
+roary_script_output_folder = os.path.join(output_folder_scripts, "roary")
+mkdir_if_not_exists(samples_output_folder)
+mkdir_if_not_exists(profile_output_folder)
+mkdir_if_not_exists(roary_output_folder)
+mkdir_if_not_exists(sim_script_output_folder)
+mkdir_if_not_exists(roary_script_output_folder)
+
 # Generate 
 for s in range(sample_number):
     print("Sample {}".format(s))
     sample_folder = "sample_{}".format(s)
-    sample_shell_script = "{}/sample_{}.sh".format(output_folder_scripts, s)
+    sample_sim_shell_script = "{}/sample_{}.sh".format(sim_script_output_folder, s)
+    gold_standard_profile = "{}/gold_standard_{}.profile".format(profile_output_folder, s)
     
     # Select species
     selected_species = Selector.select_species(gr, species_number, predicate=lambda x: not x.r_species.startswith('s__GUT'))
     selected_genomes = Selector.select_genomes_for_species(gr, selected_species)
+
+    # map(lambda x: add_genomes_to_species_dict(genomes_per_species, x), selected_genomes)
+    add_genomes_to_species_dict(genomes_per_species, selected_genomes)
+
+    print("Len genomes per species: {}".format(len(genomes_per_species)))
+
     genomes, vcovs = ProfileGenerator.generate_vertical_coverage(selected_genomes, 0.2, 70)
     
-    sample_output_folder = "{}/{}".format(output_folder, sample_folder)
+    sample_output_folder = "{}/{}".format(samples_output_folder, sample_folder)
     mkdir_if_not_exists(sample_output_folder)
-    ProfileGenerator.generate_scripts(sample_output_folder, sample_shell_script, genomes, vcovs, "sample{}".format(s))
-    print("Script file: {}".format(sample_shell_script))
+
+    ProfileGenerator.generate_scripts(sample_output_folder, sample_sim_shell_script, genomes, vcovs, "sample{}".format(s))
+    with open(gold_standard_profile, 'w') as output:
+        ProfileGenerator.write_profile(output, genomes, vcovs)
+
+    print("Script file: {}".format(sample_sim_shell_script))
     
-    
+ProfileGenerator.generate_roary_scripts(output_folder, roary_script_output_folder, genomes_per_species)
+for key, value in genomes_per_species.items():
+    print(key)
+    print(len(value))
     
