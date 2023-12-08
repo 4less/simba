@@ -206,7 +206,7 @@ ROARY_FOLDER={}
 mkdir -p $PROKKA_FOLDER
 mkdir -p $ROARY_FOLDER
 
-for GENOME in GENOMES; do
+for GENOME in $GENOMES; do
 	#GENOME=$(echo $line | cut -f2 -d' ')
 	GENOME_UNZIP=$(echo $GENOME | sed 's/\.gz//')
     PREFIX=$(basename $GENOME_UNZIP | sed 's/\.fna//')
