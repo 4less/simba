@@ -22,8 +22,8 @@ parser = get_simba_refactor_argument_parser()
 args = parser.parse_args()
 
 # general
-output_folder = getattr(args, Args.OUTPUT_FOLDER)
-output_folder_scripts = getattr(args, Args.OUTPUT_FOLDER_SCRIPTS)
+output_folder = os.path.abspath(getattr(args, Args.OUTPUT_FOLDER))
+output_folder_scripts = os.path.abspath(getattr(args, Args.OUTPUT_FOLDER_SCRIPTS))
 
 mkdir_if_not_exists(output_folder_scripts)
 
