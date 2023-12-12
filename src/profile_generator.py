@@ -1,5 +1,6 @@
 import os
 import numpy as np
+import re
 
 from scipy.stats import nbinom
 from scipy.stats import powerlaw
@@ -11,6 +12,14 @@ from src.simulator_wrappers import Simulator
 from src.utils import make_executable, longest_common_prefix, keep_only_folder, mkdir_if_not_exists
 from src.genome_resource import Genome
 
+def replace_extension(input_string, replacement_extension=''):
+    # Define a regular expression pattern for ".fna.gz" or ".fna" at the end of a string
+    pattern = re.compile(r'\.fna(\.gz)?$')
+
+    # Use re.sub() to replace the matched pattern with your desired replacement
+    result = re.sub(pattern, replacement_extension, input_string)
+
+    return result
 
 def randomize_distr(distr, alpha: int = 2):
     sum_old = 0
@@ -52,6 +61,10 @@ def scale_counts(counts, min_vcov, max_vcov):
     factor: float = (max_vcov - min_vcov) / max_c
     
     return [(factor * count) + min_vcov for count in counts]
+
+
+def batch_list(input_list, batch_size):
+    return [list(range(i, min(i + batch_size, len(input_list)))) for i in range(0, len(input_list), batch_size)]
 
 class ProfileGenerator:
     @staticmethod
@@ -118,24 +131,16 @@ class ProfileGenerator:
         read_list_rev = []
 
         for genome, coverage in zip(genomes, coverages):
-            shortened_genome_path = genome.path.replace(lcpath, "") if len(lcpath) > 0 else genome.path
-            genome_str_zip = "${{{}}}/{}".format(VARIABLE_STRING, shortened_genome_path)
-            genome_str_unzip = "${{{}}}/{}".format(VARIABLE_STRING, shortened_genome_path).replace('.gz', '')
+            shortened_genome_path = genome.unzipped_path().replace(lcpath, "") if len(lcpath) > 0 else genome.path
+            genome_str = "${{{}}}/{}".format(VARIABLE_STRING, shortened_genome_path).replace('.gz', '')
 
-            shell_command, read_fwd, read_rev = Simulator.get_art_illumina(genome_str_unzip, "${{{}}}/{}".format(SIMULATION_OUTPUT, genome.id), True, 150, coverage)
+            shell_command, read_fwd, read_rev = Simulator.get_art_illumina(genome_str, "${{{}}}/{}".format(SIMULATION_OUTPUT, genome.id), True, 150, coverage)
 
             read_list_fwd.append(read_fwd)
             read_list_rev.append(read_rev)
 
-
-            # unzip genome
-            output.write("gunzip {}\n".format(genome_str_zip))
-
             output.write(' '.join(map(str, shell_command)))
             output.write('\n')
-
-            # zip genome again
-            output.write("gzip {}\n".format(genome_str_unzip))
 
         read_fwd_out = "${{{}}}/{}_1.fq".format(SIMULATION_OUTPUT_JOINT, sample_id)
         read_rev_out = "${{{}}}/{}_2.fq".format(SIMULATION_OUTPUT_JOINT, sample_id)
@@ -184,45 +189,53 @@ class ProfileGenerator:
         make_executable(simulate_shell_script)
 
     @staticmethod
-    def generate_roary_scripts(output_folder, script_folder, species_to_genomes):
+    def generate_roary_scripts(output_folder, script_folder, species_to_genomes, threads=16, batch_size=10):
         prokka_out = "{}/{}".format(output_folder, "prokka")
         roary_out = "{}/{}".format(output_folder, "roary")
 
+        prokka_script_folder = "{}/{}".format(script_folder, "prokka")
+        roary_script_folder = "{}/{}".format(script_folder, "roary")
+
         mkdir_if_not_exists(prokka_out)
         mkdir_if_not_exists(roary_out)
+        mkdir_if_not_exists(prokka_script_folder)
+        mkdir_if_not_exists(roary_script_folder)
+
+        all_genomes = list(set(genome for species, genomes in species_to_genomes.items() for genome in genomes))
+
+        for bi, batch in enumerate(batch_list(all_genomes, batch_size)):
+            batch_script = "{}/prokka_batch_{}.sh".format(prokka_script_folder, bi)
+            with open(batch_script, 'w') as out:
+                out.write("#!/bin/bash\n\n")
+                out.write("PROKKA_FOLDER={}\n".format(prokka_out))
+                out.write("THREADS={}\n".format(threads))
+                for index in batch:
+                    genome = all_genomes[index]
+                    out.write("prokka --outdir $PROKKA_FOLDER --prefix {} --cpus $THREADS --force {}\n".format(
+                        genome.id,
+                        genome.unzipped_path()
+                    ))
 
         for species, genomes in species_to_genomes.items():
             species_name = species.replace(' ', '_')
-            species_script = "{}/{}.sh".format(script_folder, species_name)
-            print(species_script)
+            species_script = "{}/{}.sh".format(roary_script_folder, species_name)
+            species_roary_out = "{}/{}".format(roary_out, species_name)
+            species_genomes_roary_out = "{}/genomes/".format(species_roary_out)
+            
+            mkdir_if_not_exists(species_roary_out)
+            mkdir_if_not_exists(species_genomes_roary_out)
 
             with open(species_script, 'w') as out:
                 out.write('#!/bin/bash\n')
-                out.write("""
-GENOMES=\"{}\"
-PROKKA_FOLDER={}
-ROARY_FOLDER={}
+                out.write("PROKKA_FOLDER={}\n".format(species_genomes_roary_out))
+                out.write("ROARY_FOLDER={}\n".format(species_roary_out))
+                for genome in genomes:
+                    gff_file = "{}.gff".format(genome.id)
+                    gff_source = "{}/{}".format(prokka_out, gff_file)
+                    out.write("ln -s {} {}\n".format(gff_source, "${{PROKKA_FOLDER}}".format(prokka_out)))
 
-mkdir -p $PROKKA_FOLDER
-mkdir -p $ROARY_FOLDER
+                out.write("\nroary -e --mafft -p 16 ${PROKKA_FOLDER}/*.gff -f ${ROARY_FOLDER}")
 
-for GENOME in $GENOMES; do
-	#GENOME=$(echo $line | cut -f2 -d' ')
-	GENOME_UNZIP=$(echo $GENOME | sed 's/\.gz//')
-    PREFIX=$(basename $GENOME_UNZIP | sed 's/\.fna//')
-
-    echo "gunzip $GENOME"
-    echo "srun prokka --outdir $PROKKA_FOLDER --prefix $PREFIX --cpus 16 --force $GENOME_UNZIP"
-    echo "gzip $GENOME_UNZIP"
-
-    gunzip $GENOME
-	prokka --outdir $PROKKA_FOLDER --prefix $PREFIX --cpus 16 --force $GENOME_UNZIP
-    gzip $GENOME_UNZIP
-done
-
-roary -e --mafft -p 16 ${{PROKKA_FOLDER}}/*.gff -f ${{ROARY_FOLDER}}
-ln -s ${{ROARY_FOLDER}}/*/core_gene_alignment.aln ${{ROARY_FOLDER}}
-""".format(' '.join(map(lambda x: x.path, genomes)), prokka_out, roary_out))
 
     @staticmethod
     def generate_benchpro_scripts():

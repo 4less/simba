@@ -25,6 +25,9 @@ class Genome:
             print(f"lineage string {lineage} is malformated")
         return Genome(gid, path, tokens[0], tokens[1], tokens[2], tokens[3], tokens[4], tokens[5], tokens[6])
 
+    def unzipped_path(self):
+        return self.path.replace(".gz", "")
+    
     def lineage_string(self):
         return ';'.join([getattr(self, f) for f in self.RANK_FIELDS])
 
