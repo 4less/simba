@@ -88,14 +88,19 @@ for s in range(sample_number):
     sample_output_folder = "{}/{}".format(samples_output_folder, sample_folder)
     mkdir_if_not_exists(sample_output_folder)
 
+    # Write read simulation scripts
     ProfileGenerator.generate_scripts(sample_output_folder, sample_sim_shell_script, genomes, vcovs, "sample{}".format(s))
+
+    # Write gold standard profiles
     with open(gold_standard_profile, 'w') as output:
         ProfileGenerator.write_profile(output, genomes, vcovs)
 
     print("Script file: {}".format(sample_sim_shell_script))
     
+
 ProfileGenerator.generate_roary_scripts(output_folder, roary_script_output_folder, genomes_per_species)
+
 for key, value in genomes_per_species.items():
     print(key)
     print(len(value))
-    
+    print(set(name.id for name in value))

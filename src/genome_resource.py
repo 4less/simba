@@ -31,6 +31,16 @@ class Genome:
     def to_string(self):
         return "{}\t{}".format(self.id, self.lineage_string())
 
+    def __eq__(self, other):
+        """Override the equality comparison."""
+        if isinstance(other, Genome):
+            """Compare all attributes between two objects."""
+            return self.__dict__ == other.__dict__
+        return False
+
+    def __hash__(self):
+        """Override the hash function."""
+        return hash(self.id)
 
 class Rank:
     Domain = "Domain"
