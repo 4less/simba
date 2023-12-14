@@ -35,6 +35,9 @@ def randomize_distr(distr, alpha: int = 2):
 
     return distr
 
+def linear_distr(data_points: int):
+    return list(range(1, data_points + 1))
+
 def pareto_distr(data_points: int):
     a = 0.15
     x_m = 1
@@ -94,7 +97,12 @@ class ProfileGenerator:
         random.shuffle(genomes)
         m = len(genomes)
         
-        initial_vcov = pareto_distr(m)
+        if method == "pareto":
+            initial_vcov = pareto_distr(m)
+        elif method == "linear":
+            initial_vcov = linear_distr(m)
+        else:
+            initial_vcov = linear_distr(m)
         
         scaled_vcov = scale_counts(initial_vcov, min_vcov, max_vcov)
         
