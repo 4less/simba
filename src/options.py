@@ -197,6 +197,8 @@ class Args:
     TREE = 'tree'
     OUTPUT_FOLDER = 'output_folder'
     OUTPUT_FOLDER_SCRIPTS = "script_folder"
+    MIN_COVERAGE = "min_vcov"
+    MAX_COVERAGE = "max_vcov"
 
 
 def get_simba_refactor_argument_parser():
@@ -250,6 +252,18 @@ def get_simba_refactor_argument_parser():
                            default=1,
                            action='store',
                            help='Number of different species in a sample. 0 for all available.')
+
+    my_parser.add_argument(f"--{Args.MIN_VCOVERAGE}",
+                           type=int,
+                           default=0.2,
+                           action='store',
+                           help='In each sample this sets the lower boundary for vcov in a samples\' coverage profile.' )
+
+    my_parser.add_argument(f"--{Args.MAX_VCOVERAGE}",
+                           type=int,
+                           default=70,
+                           action='store',
+                           help='In each sample this sets the upper boundary for vcov in a samples\' coverage profile.' )
 
     ##############################################################################
     # Between sample parameters

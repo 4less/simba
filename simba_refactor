@@ -81,7 +81,7 @@ for s in range(sample_number):
 
     print("Len genomes per species: {}".format(len(genomes_per_species)))
 
-    genomes, vcovs = ProfileGenerator.generate_vertical_coverage(selected_genomes, 0.2, 70)
+    genomes, vcovs = ProfileGenerator.generate_vertical_coverage(selected_genomes, getattr(args, Args.MIN_COVERAGE), getattr(args, Args.MAX_COVERAGE))
     
     sample_output_folder = "{}/{}".format(samples_output_folder, sample_folder)
     mkdir_if_not_exists(sample_output_folder)
