@@ -91,6 +91,7 @@ class ProfileGenerator:
         """
 
         genomes = list(genomes)
+        random.shuffle(genomes)
         m = len(genomes)
         
         initial_vcov = pareto_distr(m)
