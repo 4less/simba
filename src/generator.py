@@ -233,7 +233,6 @@ mv $MSA.treefile $TREETMP
         species_to_msa = dict()
 
         for species, metaentries in meta_dict.items():
-
             species_name = species.replace(' ', '_')
             species_msa_file = "{}.msa.fna".format(species_name)
             species_script = "{}/{}.sh".format(roary_script_folder, species_name)
