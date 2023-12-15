@@ -133,6 +133,18 @@ species_to_msa = Generator.generate_roary_scripts(output_folder, output_folder_s
 Generator.generate_tree_scripts(tree_script_output_folder, tree_output_folder, output_folder, species_to_msa)
 Generator.generate_meta_files(meta_output_folder, meta_dict)
 
+all_genomes = list(set(genome for species, genomes in genomes_per_species.items() for genome in genomes))
+with open("{}/{}".format(output_folder_scripts, "gunzip.sh"), 'w') as out:
+    out.write("#!/bin/bash\n\n")
+    for genome in all_genomes:
+        out.write("gunzip {}\n".format(genome.path))
+
+with open("{}/{}".format(output_folder_scripts, "gzip.sh"), 'w') as out:
+    out.write("#!/bin/bash\n\n")
+    for genome in all_genomes:
+        out.write("gzip {}\n".format(genome.unzipped_path()))
+
+
 ####################################################################
 # Summary
 
