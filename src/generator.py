@@ -160,10 +160,10 @@ class Generator:
 
     @staticmethod
     def generate_meta_file(out, meta_entries):
-        out.write("ID\tspecies\tcoverage\tpath\n")
+        out.write("ID\tgenome\tspecies\tcoverage\tpath\n")
         for metaentry in meta_entries:
             genome, vcov, sample = metaentry
-            out.write(f"{sample.name}\t{genome.r_species}\t{vcov}\t{genome.path}\n")
+            out.write(f"{sample.name}\t{genome.id}\t{genome.r_species}\t{vcov}\t{genome.path}\n")
 
     @staticmethod
     def generate_meta_files(output_folder, meta_dict):
