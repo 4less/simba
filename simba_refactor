@@ -8,16 +8,29 @@ import random
 import stat
 import subprocess
 from ete3 import Tree
+from collections import namedtuple
 
-from src.profile_generator import ProfileGenerator
+from src.generator import Generator
 from src.selector import Selector
 from src.tree_node import TreeNode
 # from src.genome import Genome, load_genomes
 from src.options import get_simba_argument_parser, get_simba_refactor_argument_parser, Args
 from src.genome_resource import GenomeResource, Rank, Genome
 from src.utils import mkdir_if_not_exists
+from src.sample import Sample
 
-## Parse args
+
+def add_genomes_to_species_dict(species_dict, genomes):
+    print("Add")
+    for genome in genomes:
+        species = genome.r_species
+
+        if species not in species_dict:
+            species_dict[species] = set()
+        species_dict[species].add(genome)
+
+
+# Parse args
 parser = get_simba_refactor_argument_parser()
 args = parser.parse_args()
 
@@ -35,6 +48,8 @@ species_number = getattr(args, Args.SPECIES_NUMBER)
 sample_number = getattr(args, Args.SAMPLES)
 shared_species_number_total = getattr(args, Args.SHARED_SPECIES_NUMBER_TOTAL)
 
+min_cov = getattr(args, Args.MIN_VCOVERAGE)
+max_cov = getattr(args, Args.MAX_VCOVERAGE)
 
 # IO
 gr = GenomeResource(getattr(args, Args.GENOME_MAP))
@@ -44,74 +59,106 @@ if not gr.has_x_of_rank(species_number, Rank.Species):
     print("Not enough species in the genome map")
     exit(9)
 
-
-def add_genomes_to_species_dict(species_dict, genomes):
-    print("Add")
-    for genome in genomes:
-        species = genome.r_species
-
-        if species not in species_dict:
-            species_dict[species] = set()
-        species_dict[species].add(genome)
-
 genomes_per_species = dict()
+
+####################################################################
+# Set Variables and Folders
 
 samples_output_folder = os.path.join(output_folder, "samples")
 profile_output_folder = os.path.join(output_folder, "gold_profiles")
+meta_output_folder = os.path.join(output_folder, "meta_files")
 roary_output_folder = os.path.join(output_folder, "roary_output")
+tree_output_folder = os.path.join(output_folder, "trees")
 sim_script_output_folder = os.path.join(output_folder_scripts, "read_simulation")
+tree_script_output_folder = os.path.join(output_folder_scripts, "trees")
 mkdir_if_not_exists(samples_output_folder)
 mkdir_if_not_exists(profile_output_folder)
+mkdir_if_not_exists(meta_output_folder)
 mkdir_if_not_exists(roary_output_folder)
+mkdir_if_not_exists(tree_output_folder)
 mkdir_if_not_exists(sim_script_output_folder)
+mkdir_if_not_exists(tree_script_output_folder)
 
-# Generate 
-for s in range(sample_number):
-    print("Sample {}".format(s))
-    sample_folder = "sample_{}".format(s)
-    sample_sim_shell_script = "{}/sample_{}.sh".format(sim_script_output_folder, s)
-    gold_standard_profile = "{}/gold_standard_{}.profile".format(profile_output_folder, s)
-    
-    # Select species
-    selected_species = Selector.select_species(gr, species_number, predicate=lambda x: not x.r_species.startswith('s__GUT'))
-    selected_genomes = Selector.select_genomes_for_species(gr, selected_species)
 
-    # map(lambda x: add_genomes_to_species_dict(genomes_per_species, x), selected_genomes)
-    add_genomes_to_species_dict(genomes_per_species, selected_genomes)
 
-    print("Len genomes per species: {}".format(len(genomes_per_species)))
+def generate_sample(sample_name, sample_id, genome_resource, species_number, min_cov, max_cov, method="pareto"):
+    selected_species = Selector.select_species(genome_resource, species_number, predicate=lambda x: not x.r_species.startswith('s__GUT'))
+    selected_genomes = Selector.select_genomes_for_species(genome_resource, selected_species)
+    genomes, vcovs = Generator.generate_vertical_coverage(selected_genomes, min_cov, max_cov, method=method)
 
-    genomes, vcovs = ProfileGenerator.generate_vertical_coverage(selected_genomes, getattr(args, Args.MIN_COVERAGE), getattr(args, Args.MAX_COVERAGE))
-    
-    sample_output_folder = "{}/{}".format(samples_output_folder, sample_folder)
-    mkdir_if_not_exists(sample_output_folder)
+    sample = Sample()
+    sample.name = sample_name
+    sample.id = sample_id
+    sample.genomes = genomes
+    sample.vertical_coverages = vcovs
+    sample.setup()
 
-    # Write read simulation scripts
-    ProfileGenerator.generate_scripts(sample_output_folder, sample_sim_shell_script, genomes, vcovs, "sample{}".format(s))
+    return sample
 
-    # Write gold standard profiles
+
+def generate_species_meta(samples: list[Sample]):
+    meta_dict = dict()
+
+    rset = samples[0].rank_set(Rank.Species)
+
+    MetaEntry = namedtuple("MetaEntry", "genome, coverage, sample")
+
+    for sample in samples:
+        for species, taxab in sample.rank_set(Rank.Species).items():
+            if len(taxab) != 1:
+                print("Cannot currently do conspecific strains")
+                return dict()
+
+            genome, vcov = taxab[0]
+            if species not in meta_dict:
+                meta_dict[species] = []
+            meta_dict[species].append(MetaEntry(genome, vcov, sample))
+
+    return meta_dict
+
+
+def generate_simulation_scripts_from_sample(sample: Sample, script_output_folder, data_output_folder):
+    sim_script = "{}/{}.sh".format(script_output_folder, sample.name)
+    sample_output_folder = "{}/{}".format(data_output_folder, sample.name)
+    Generator.generate_scripts(sample_output_folder, sim_script, sample.genomes, sample.vertical_coverages, "sample{}".format(sample.id))
+
+
+def generate_gold_standards_from_samples(sample: Sample, profile_output_folder):
+    gold_standard_profile = "{}/gold_standard_{}.profile".format(profile_output_folder, sample.id)
     with open(gold_standard_profile, 'w') as output:
-        ProfileGenerator.write_profile(output, genomes, vcovs)
+        Generator.write_profile(output, sample.genomes, sample.vertical_coverages)
 
-    print("Script file: {}".format(sample_sim_shell_script))
-    
 
-## For all samples
+# Change every generator script to
+# OUTPUT FOLDER
+# OUTPUT_BASENAME
+# FILE_EXTENSION
 
-all_genomes = list(set(genome for species, genomes in genomes_per_species.items() for genome in genomes))
-with open("{}/{}".format(output_folder_scripts, "gunzip.sh"), 'w') as out:
-    out.write("#!/bin/bash\n\n")
-    for genome in all_genomes:
-        out.write("gunzip {}\n".format(genome.path))
+####################################################################
+# generate samples
 
-with open("{}/{}".format(output_folder_scripts, "gzip.sh"), 'w') as out:
-    out.write("#!/bin/bash\n\n")
-    for genome in all_genomes:
-        out.write("gzip {}\n".format(genome.unzipped_path()))
+samples = [generate_sample("sample{}".format(sid), sid, gr, species_number, min_cov, max_cov)
+           for sid in range(sample_number)]
+meta_dict = generate_species_meta(samples)
 
-ProfileGenerator.generate_roary_scripts(output_folder, output_folder_scripts, genomes_per_species, batch_size=10)
+####################################################################
+# Generate scripts
 
-for key, value in genomes_per_species.items():
-    print(key)
-    print(len(value))
-    print(set(name.id for name in value))
+for sample in samples:
+    generate_simulation_scripts_from_sample(sample, sim_script_output_folder, samples_output_folder)
+    generate_gold_standards_from_samples(sample, profile_output_folder)
+
+species_to_msa = Generator.generate_roary_scripts(output_folder, output_folder_scripts, meta_dict, batch_size=10)
+Generator.generate_tree_scripts(tree_script_output_folder, tree_output_folder, output_folder, species_to_msa)
+Generator.generate_meta_files(meta_output_folder, meta_dict)
+
+####################################################################
+# Summary
+
+print("Summary______________________")
+print("Samples output:      {}".format(samples_output_folder))
+print("Profiles output:     {}".format(profile_output_folder))
+print("Meta output:         {}".format(meta_output_folder))
+print("Roary output:        {}".format(roary_output_folder))
+print("Tree output:         {}".format(tree_output_folder))
+print("Simscript output:    {}".format(sim_script_output_folder))

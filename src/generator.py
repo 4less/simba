@@ -1,10 +1,7 @@
 import os
 import numpy as np
 import re
-
-from scipy.stats import nbinom
-from scipy.stats import powerlaw
-from scipy.stats import pareto
+from src.distributions import *
 
 import random
 
@@ -21,40 +18,6 @@ def replace_extension(input_string, replacement_extension=''):
 
     return result
 
-def randomize_distr(distr, alpha: int = 2):
-    sum_old = 0
-    sum_new = 0
-    for i in range(0, len(distr)):
-        # weight = 1 / (i/2+1)
-        # weight = 3/(i+1)
-        weight = 0.3 + (10 / len(distr) * min(i, 10)) / 10
-        random_element = random.uniform(-1 * weight, weight)
-        distr[i] += abs(random_element * distr[i] * alpha)
-        distr = list(distr)
-        distr.sort(reverse=True)
-
-    return distr
-
-def linear_distr(data_points: int):
-    return list(range(1, data_points + 1))
-
-def pareto_distr(data_points: int):
-    a = 0.15
-    x_m = 1
-    samples = np.linspace(start=0, stop=data_points + 1, num=data_points + 1)
-    output = np.array(pareto.pdf(x=samples, b=a, loc=0, scale=x_m))
-    
-    values = randomize_distr(output.T[1:])
-    scale = 1 / sum(values)
-    
-    values = [scale * val for val in values]
-
-    return values
-
-
-# def scale_counts(counts, new_total: int):
-#     factor: float = new_total / sum(counts)
-#     return [factor * count for count in counts]
 
 def scale_counts(counts, min_vcov, max_vcov):
     min_c = min(counts)
@@ -66,10 +29,10 @@ def scale_counts(counts, min_vcov, max_vcov):
     return [(factor * count) + min_vcov for count in counts]
 
 
-def batch_list(input_list, batch_size):
+def batch_list(input_list, batch_size: int):
     return [list(range(i, min(i + batch_size, len(input_list)))) for i in range(0, len(input_list), batch_size)]
 
-class ProfileGenerator:
+class Generator:
     @staticmethod
     def generate_vertical_coverage(genomes, min_vcov, max_vcov, method="pareto"):
         """Generates vertical coverages for genomes
@@ -165,8 +128,6 @@ class ProfileGenerator:
         output.write('\n')
 
 
-
-
     @staticmethod
     def write_profile(output, genomes: set[Genome], coverages, delimiter='\t'):
         total_coverage = sum(coverages)
@@ -193,11 +154,56 @@ class ProfileGenerator:
         joint_read_output_folder_abs = os.path.abspath(output_folder)
 
         with open(simulate_shell_script, 'w') as output:
-            ProfileGenerator.write_simulate_reads_script(output, joint_read_output_folder_abs, single_read_output_folder_abs, genomes, vcovs, sample_id, gzip=True)
+            Generator.write_simulate_reads_script(output, joint_read_output_folder_abs, single_read_output_folder_abs, genomes, vcovs, sample_id, gzip=True)
         make_executable(simulate_shell_script)
 
+
     @staticmethod
-    def generate_roary_scripts(output_folder, script_folder, species_to_genomes, threads=16, batch_size=10):
+    def generate_meta_file(out, meta_entries):
+        out.write("ID\tspecies\tcoverage\tpath\n")
+        for metaentry in meta_entries:
+            genome, vcov, sample = metaentry
+            out.write(f"{sample.name}\t{genome.r_species}\t{vcov}\t{genome.path}\n")
+
+    @staticmethod
+    def generate_meta_files(output_folder, meta_dict):
+        for species, metaentries in meta_dict.items():
+            meta_file = "{}/{}.meta.tsv".format(output_folder, species.replace(' ', '_'))
+            with open(meta_file, 'w') as out:
+                Generator.generate_meta_file(out, metaentries)
+
+
+    @staticmethod
+    def generate_tree_script(out, tree_file, tree_tmp, tree_base, msa):
+        out.write("#!/bin/bash\n\n")
+        out.write("""
+TIMESTR=`date +%Y%m%d-%H%M%S`
+TREETMP={}/{}_iqtree_$TIMESTR
+MSA = ${{{}}}
+iqtree \\
+    -s $MSA \\
+    -fast \\
+    -m {}
+
+mv $MSA.bionj $TREETMP
+mv $MSA.ckp.gz $TREETMP
+mv $MSA.iqtree $TREETMP
+mv $MSA.log $TREETMP
+mv $MSA.uniqueseq.phy $TREETMP
+cp $MSA.treefile {}
+mv $MSA.treefile $TREETMP
+        """.format(tree_tmp, tree_base, msa, "GTR", tree_file))
+
+    @staticmethod
+    def generate_tree_scripts(script_folder, tree_output_folder, msa_folder, msa_dict, method="iqtree"):
+        for species, msa_file in msa_dict.items():
+            tree_file = "{}/{}.{}.nwk".format(tree_output_folder, species, method)
+            tree_script_file = "{}/{}.{}.sh".format(script_folder, species.replace(' ', '_'), method)
+            with open(tree_script_file, 'w') as out:
+                Generator.generate_tree_script(out, tree_file,  tree_output_folder, species, "{}/{}".format(msa_folder, msa_file))
+
+    @staticmethod
+    def generate_roary_scripts(output_folder, script_folder, meta_dict, threads=16, batch_size=10):
         prokka_out = "{}/{}".format(output_folder, "prokka")
         roary_out = "{}/{}".format(output_folder, "roary")
 
@@ -209,7 +215,7 @@ class ProfileGenerator:
         mkdir_if_not_exists(prokka_script_folder)
         mkdir_if_not_exists(roary_script_folder)
 
-        all_genomes = list(set(genome for species, genomes in species_to_genomes.items() for genome in genomes))
+        all_genomes = list(set(genome for species, meta in meta_dict.items() for genome, vcov, sample in meta))
 
         for bi, batch in enumerate(batch_list(all_genomes, batch_size)):
             batch_script = "{}/prokka_batch_{}.sh".format(prokka_script_folder, bi)
@@ -224,8 +230,12 @@ class ProfileGenerator:
                         genome.unzipped_path()
                     ))
 
-        for species, genomes in species_to_genomes.items():
+        species_to_msa = dict()
+
+        for species, metaentries in meta_dict.items():
+
             species_name = species.replace(' ', '_')
+            species_msa_file = "{}.msa.fna".format(species_name)
             species_script = "{}/{}.sh".format(roary_script_folder, species_name)
             species_roary_out = "{}/{}".format(roary_out, species_name)
             species_genomes_roary_out = "{}/genomes/".format(species_roary_out)
@@ -233,17 +243,22 @@ class ProfileGenerator:
             mkdir_if_not_exists(species_roary_out)
             mkdir_if_not_exists(species_genomes_roary_out)
 
+            species_to_msa[species_name] = species_msa_file
+
             with open(species_script, 'w') as out:
                 out.write('#!/bin/bash\n')
                 out.write("PROKKA_FOLDER={}\n".format(species_genomes_roary_out))
                 out.write("ROARY_FOLDER={}\n".format(species_roary_out))
-                for genome in genomes:
+                for me in metaentries:
+                    genome, vcov, sample = me
                     gff_file = "{}.gff".format(genome.id)
                     gff_source = "{}/{}".format(prokka_out, gff_file)
                     out.write("ln -s {} {}\n".format(gff_source, "${{PROKKA_FOLDER}}".format(prokka_out)))
 
-                out.write("\nroary -e --mafft -p 16 ${PROKKA_FOLDER}/*.gff -f ${ROARY_FOLDER}")
+                out.write("\nroary -e --mafft -p 16 ${PROKKA_FOLDER}/*.gff -f ${ROARY_FOLDER}/output\n")
+                out.write("ln -s ${{ROARY_FOLDER}}/core_gene_alignment.aln ${{ROARY_FOLDER}}/{}\n".format(species_msa_file))
 
+        return species_to_msa
 
     @staticmethod
     def generate_benchpro_scripts():

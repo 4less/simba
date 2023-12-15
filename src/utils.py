@@ -167,7 +167,4 @@ def keep_only_folder(path):
     modified_path = path
     if index_of_last_slash != -1:
         modified_path = path[:index_of_last_slash]
-        print("Modified Path:", modified_path)
-    else:
-        print("No slash found in the path.")
     return modified_path

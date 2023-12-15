@@ -4,6 +4,16 @@ import pandas as pd
 from collections import Counter
 
 
+class Rank:
+    Domain = "Domain"
+    Phylum = "Phylum"
+    Class = "Class"
+    Order = "Order"
+    Family = "Family"
+    Genus = "Genus"
+    Species = "Species"
+    All = [Domain, Phylum, Class, Order, Family, Genus, Species]
+
 class Genome:
     RANK_FIELDS = ['r_domain', 'r_phylum', 'r_class', 'r_order', 'r_family', 'r_genus', 'r_species']
     
@@ -45,16 +55,24 @@ class Genome:
         """Override the hash function."""
         return hash(self.id)
 
-class Rank:
-    Domain = "Domain"
-    Phylum = "Phylum"
-    Class = "Class"
-    Order = "Order"
-    Family = "Family"
-    Genus = "Genus"
-    Species = "Species"
-    All = [Domain, Phylum, Class, Order, Family, Genus, Species]
-
+    def taxon_at(self, rank):
+        match rank:
+            case Rank.Domain:
+                return self.r_domain
+            case Rank.Phylum:
+                return self.r_phylum
+            case Rank.Class:
+                return self.r_class
+            case Rank.Order:
+                return self.r_order
+            case Rank.Family:
+                return self.r_family
+            case Rank.Genus:
+                return self.r_genus
+            case Rank.Species:
+                return self.r_species
+            case _:
+                return "Unknown rank"
 
 class GenomeResource:
     GENOME_COLUMN_NAME = ""

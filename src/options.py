@@ -197,8 +197,8 @@ class Args:
     TREE = 'tree'
     OUTPUT_FOLDER = 'output_folder'
     OUTPUT_FOLDER_SCRIPTS = "script_folder"
-    MIN_COVERAGE = "min_vcov"
-    MAX_COVERAGE = "max_vcov"
+    MIN_VCOVERAGE = "min_vcov"
+    MAX_VCOVERAGE = "max_vcov"
 
 
 def get_simba_refactor_argument_parser():
