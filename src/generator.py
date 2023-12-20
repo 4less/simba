@@ -179,7 +179,7 @@ class Generator:
         out.write("""
 TIMESTR=`date +%Y%m%d-%H%M%S`
 TREETMP={}/{}_iqtree_$TIMESTR
-MSA = ${{{}}}
+MSA={}
 iqtree \\
     -s $MSA \\
     -fast \\
@@ -200,7 +200,7 @@ mv $MSA.treefile $TREETMP
             tree_file = "{}/{}.{}.nwk".format(tree_output_folder, species, method)
             tree_script_file = "{}/{}.{}.sh".format(script_folder, species.replace(' ', '_'), method)
             with open(tree_script_file, 'w') as out:
-                Generator.generate_tree_script(out, tree_file,  tree_output_folder, species, "{}/{}".format(msa_folder, msa_file))
+                Generator.generate_tree_script(out, tree_file,  tree_output_folder, species, "{}/{}/{}".format(msa_folder, species, msa_file))
 
     @staticmethod
     def generate_roary_scripts(output_folder, script_folder, meta_dict, threads=16, batch_size=10):

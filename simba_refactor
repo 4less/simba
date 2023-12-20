@@ -130,7 +130,7 @@ for sample in samples:
     generate_gold_standards_from_samples(sample, profile_output_folder)
 
 species_to_msa = Generator.generate_roary_scripts(output_folder, output_folder_scripts, meta_dict, batch_size=10)
-Generator.generate_tree_scripts(tree_script_output_folder, tree_output_folder, output_folder, species_to_msa)
+Generator.generate_tree_scripts(tree_script_output_folder, tree_output_folder, output_folder + "/roary/", species_to_msa)
 Generator.generate_meta_files(meta_output_folder, meta_dict)
 
 all_genomes = list(set(genome for species, meta in meta_dict.items() for genome, vcov, sample in meta))
