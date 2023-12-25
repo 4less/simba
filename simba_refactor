@@ -9,6 +9,7 @@ from src.options import get_simba_refactor_argument_parser, Args
 from src.genome_resource import GenomeResource, Rank, Genome
 from src.utils import mkdir_if_not_exists
 from src.sample import Sample
+from loguru import logger
 
 
 # Parse args
@@ -28,6 +29,7 @@ species_number = getattr(args, Args.SPECIES_NUMBER)
 # between sample params
 sample_number = getattr(args, Args.SAMPLES)
 shared_species_number_total = getattr(args, Args.SHARED_SPECIES_NUMBER_TOTAL)
+
 
 min_cov = getattr(args, Args.MIN_VCOVERAGE)
 max_cov = getattr(args, Args.MAX_VCOVERAGE)
@@ -64,14 +66,26 @@ mkdir_if_not_exists(tree_script_output_folder)
 
 def generate_sample(sample_name, sample_id, genome_resource, species_number, min_cov, max_cov, method="pareto"):
     selected_species = Selector.select_species(genome_resource, species_number, predicate=lambda x: not x.r_species.startswith('s__GUT'))
-    selected_genomes = Selector.select_genomes_for_species(genome_resource, selected_species)
-    genomes, vcovs = Generator.generate_vertical_coverage(selected_genomes, min_cov, max_cov, method=method)
+    selected_genomes = Selector.select_genomes_for_species(genome_resource, selected_species, select_conspecific=conspecific)
+
+    id_to_genome = dict(zip([g.id for g in selected_genomes], selected_genomes))
+
+    # Group genomes by species. make adjustable in the future
+    genome_to_group = dict(zip([g.id for g in selected_genomes], [g.r_species for g in selected_genomes]))
+
+    group_to_vcov = Generator.generate_vertical_coverage(genome_to_group, min_cov, max_cov, method=method)
+
+    assert(min_cov == min(vcov for group, vcov in group_to_vcov.items()))
+    assert(max_cov == max(vcov for group, vcov in group_to_vcov.items()))
+
+    genome_to_vcov = Generator.resolve_group_vcov(genome_to_group, group_to_vcov)
+
 
     sample = Sample()
     sample.name = sample_name
     sample.id = sample_id
-    sample.genomes = genomes
-    sample.vertical_coverages = vcovs
+    sample.genomes = [id_to_genome[gid] for gid in genome_to_vcov.keys()]
+    sample.vertical_coverages = genome_to_vcov.values()
     sample.setup()
 
     return sample
@@ -86,14 +100,17 @@ def generate_species_meta_dict(samples: list[Sample]):
 
     for sample in samples:
         for species, taxab in sample.rank_set(Rank.Species).items():
-            if len(taxab) != 1:
-                print("Cannot currently do conspecific strains")
-                return dict()
-
-            genome, vcov = taxab[0]
+            # if len(taxab) != 1:
+            #     print("Cannot currently do conspecific strains")
+            #     print("Selection: {}".format(taxab))
+            #     return dict()
+            # genome, vcov = taxab[0]
+            
             if species not in meta_dict:
                 meta_dict[species] = []
-            meta_dict[species].append(MetaEntry(genome, vcov, sample))
+
+            for genome, vcov in taxab:
+                meta_dict[species].append(MetaEntry(genome, vcov, sample))
 
     return meta_dict
 
@@ -108,6 +125,14 @@ def generate_gold_standards_from_samples(sample: Sample, profile_output_folder):
     gold_standard_profile = "{}/gold_standard_{}.profile".format(profile_output_folder, sample.id)
     with open(gold_standard_profile, 'w') as output:
         Generator.write_profile(output, sample.genomes, sample.vertical_coverages)
+
+def generate_gold_standards_conspecific_from_samples(sample: Sample, profile_output_folder):
+    gold_standard_conspecific_profile = "{}/gold_standard_conspecific_{}.profile".format(profile_output_folder, sample.id)
+    # for genome, vcov in zip(sample.genomes, sample.vertical_coverages):
+    #     print("id: {} -> {}".format(genome.id, vcov))
+    # input()
+    with open(gold_standard_conspecific_profile, 'w') as output:
+        Generator.write_conspecific_profile(output, sample.genomes, sample.vertical_coverages)
 
 
 # Change every generator script to
@@ -128,6 +153,7 @@ meta_dict = generate_species_meta_dict(samples)
 for sample in samples:
     generate_simulation_scripts_from_sample(sample, sim_script_output_folder, samples_output_folder)
     generate_gold_standards_from_samples(sample, profile_output_folder)
+    generate_gold_standards_conspecific_from_samples(sample, profile_output_folder)
 
 species_to_msa = Generator.generate_roary_scripts(output_folder, output_folder_scripts, meta_dict, batch_size=10)
 Generator.generate_tree_scripts(tree_script_output_folder, tree_output_folder, output_folder + "/roary/", species_to_msa)

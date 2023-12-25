@@ -242,9 +242,12 @@ def get_simba_refactor_argument_parser():
     # Within sample parameters
     ##############################################################################
 
+    # Conspecific arguments
     my_parser.add_argument(f"--{Args.CONSPECIFIC}",
-                           action='store_true',
-                           help='Enable having conspecific strains in a sample')
+                           type=str,
+                           default="1",
+                           action='store',
+                           help='Enable having conspecific strains in a sample.')
 
 
     my_parser.add_argument(f"--{Args.SPECIES_NUMBER}",
@@ -257,13 +260,13 @@ def get_simba_refactor_argument_parser():
                            type=int,
                            default=0.2,
                            action='store',
-                           help='In each sample this sets the lower boundary for vcov in a samples\' coverage profile.' )
+                           help='In each sample this sets the lower boundary for vcov in a samples\' coverage profile.')
 
     my_parser.add_argument(f"--{Args.MAX_VCOVERAGE}",
                            type=int,
                            default=70,
                            action='store',
-                           help='In each sample this sets the upper boundary for vcov in a samples\' coverage profile.' )
+                           help='In each sample this sets the upper boundary for vcov in a samples\' coverage profile.')
 
     ##############################################################################
     # Between sample parameters
@@ -286,6 +289,7 @@ def get_simba_refactor_argument_parser():
                            default=None,
                            action='store',
                            help='Number of different species in a sample')
+
 
 
     return my_parser

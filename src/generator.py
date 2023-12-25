@@ -1,7 +1,11 @@
 import os
+from typing import List, Tuple, Any
+
 import numpy as np
 import re
 from src.distributions import *
+from src.genome_resource import Rank, Genome
+from loguru import logger
 
 import random
 
@@ -34,13 +38,13 @@ def batch_list(input_list, batch_size: int):
 
 class Generator:
     @staticmethod
-    def generate_vertical_coverage(genomes, min_vcov, max_vcov, method="pareto"):
+    def generate_vertical_coverage(genome_to_group, min_vcov, max_vcov, method="pareto"):
         """Generates vertical coverages for genomes
 
         Parameters
         ----------
-        genomes : str
-            The file location of the spreadsheet
+        genome_to_group : list[]
+            groups of genomes to simulate coverages together for
         min_vcov : float
             A flag used to print the columns to the console (default is
             False)
@@ -52,13 +56,13 @@ class Generator:
 
         Returns
         -------
-        list
+        dict
             a list of strings used that are the header columns
         """
 
-        genomes = list(genomes)
-        random.shuffle(genomes)
-        m = len(genomes)
+        group_list = list(set(genome_to_group.values()))
+        random.shuffle(group_list)
+        m = len(group_list)
         
         if method == "pareto":
             initial_vcov = pareto_distr(m)
@@ -69,7 +73,17 @@ class Generator:
         
         scaled_vcov = scale_counts(initial_vcov, min_vcov, max_vcov)
         
-        return genomes, scaled_vcov
+
+
+        assert max_vcov == max(scaled_vcov)
+        assert min_vcov == min(scaled_vcov)
+
+        group_to_cov = dict(zip(group_list, scaled_vcov))
+
+        assert min_vcov == min(vcov for group, vcov in group_to_cov.items())
+        assert max_vcov == max(vcov for group, vcov in group_to_cov.items())
+
+        return group_to_cov
         
     @staticmethod
     def write_simulate_reads_script(output, joint_read_output_folder, simulation_output_folder, genomes, coverages, sample_id, gzip=False):
@@ -129,6 +143,31 @@ class Generator:
 
 
     @staticmethod
+    def write_conspecific_profile(output, genomes: list[Genome], coverages, delimiter='\t'):
+        species = set([g.r_species for g in genomes])
+        genome_to_coverage = { g.id: vcov for g, vcov in zip(genomes, coverages) }
+
+        total_coverage = sum(coverages)
+        for sp in species:
+            sp_genomes: list[tuple[Genome, float]] = [(g, genome_to_coverage[g.id]) for g in genomes if g.r_species == sp]
+            sp_total_coverage = sum(vcov for g, vcov in sp_genomes)
+            sp_abundance = sp_total_coverage / total_coverage
+
+            sorted(sp_genomes, key=lambda pair: pair[1], reverse=True)
+
+            for genome, coverage in sp_genomes:
+                output.write('\t'.join(map(str, [
+                    genome.id,
+                    genome.r_species,
+                    sp_total_coverage,
+                    sp_abundance,
+                    coverage,
+                    coverage / sp_total_coverage,
+                    genome.path
+                ])))
+                output.write('\n')
+
+    @staticmethod
     def write_profile(output, genomes: set[Genome], coverages, delimiter='\t'):
         total_coverage = sum(coverages)
         for genome, coverage in zip(genomes, coverages):
@@ -159,18 +198,40 @@ class Generator:
 
 
     @staticmethod
-    def generate_meta_file(out, meta_entries):
-        out.write("ID\tgenome\tspecies\tcoverage\tpath\n")
-        for metaentry in meta_entries:
-            genome, vcov, sample = metaentry
-            out.write(f"{sample.name}\t{genome.id}\t{genome.r_species}\t{vcov}\t{genome.path}\n")
+    def generate_meta_file(out, meta_entries, summary=True):
+
+        samples = set(sample.name for _, _, sample in meta_entries)
+
+        if summary:
+            out.write("ID\tspecies\tcoverage\tconspecific\tpath\n")
+            for sample in samples:
+                sp_meta_entries = [me for me in meta_entries if me.sample.name == sample]
+                if len(sp_meta_entries) == 0:
+                    for genome, vcov, sample in meta_entries:
+                        print(genome.to_string(), vcov, sample.name)
+                    print(sample)
+                    input()
+                conspecific_count = len(sp_meta_entries)
+                vcov_total = sum(vcov for _, vcov, _ in sp_meta_entries)
+                species = sp_meta_entries[0].genome.r_species
+
+                out.write(f"{sample}\t{species}\t{vcov_total}\t{conspecific_count}\t{'None' if conspecific_count > 1 else sp_meta_entries[0].genome.path }\n")
+
+        else:
+            out.write("ID\tgenome\tspecies\tcoverage\tpath\n")
+            for metaentry in meta_entries:
+                genome, vcov, sample = metaentry
+                out.write(f"{sample.name}\t{genome.id}\t{genome.r_species}\t{vcov}\t{genome.path}\n")
 
     @staticmethod
     def generate_meta_files(output_folder, meta_dict):
         for species, metaentries in meta_dict.items():
             meta_file = "{}/{}.meta.tsv".format(output_folder, species.replace(' ', '_'))
+            meta_conspecific_file = "{}/{}.conspecific.meta.tsv".format(output_folder, species.replace(' ', '_'))
             with open(meta_file, 'w') as out:
-                Generator.generate_meta_file(out, metaentries)
+                Generator.generate_meta_file(out, metaentries, summary=True)
+            with open(meta_conspecific_file, 'w') as out:
+                Generator.generate_meta_file(out, metaentries, summary=False)
 
 
     @staticmethod
@@ -263,5 +324,33 @@ mv $MSA.treefile $TREETMP
     def generate_benchpro_scripts():
         print("roar")
 
+    @staticmethod
+    def resolve_group_vcov(genome_to_group, group_to_vcov, ratio_min=1, ratio_max=9, ratio_type=int):
+        genome_to_vcov = dict()
+        sample_method = random.randint if ratio_type is int else random.uniform
+
+        for group, group_vcov in set(group_to_vcov.items()):
+            genomes = [genome for genome, ggroup in genome_to_group.items() if ggroup == group]
+
+            if len(genomes) == 1:
+                genome_to_vcov[genomes[0]] = group_vcov
+
+            logger.info("Group -> vcov: {} -> {}".format(group, group_vcov))
+            logger.info("{}: Group size: {}".format(group, len(genomes) - 1))
+            ratios = [sample_method(ratio_min, ratio_max) for _ in range(len(genomes) - 1)]
+            ratios.append(1)
+            random.shuffle(ratios)
+            scaler = 1 / sum(ratios)
+            logger.info("Ratios: {} -> Sum: {}" .format(ratios, sum(ratios)))
+            logger.info("Scaler: {}".format(scaler))
+            ratios = [scaler * r for r in ratios]
+            logger.info("Scaled ratios: {}" .format(ratios))
+
+            for genome, ratio in zip(genomes, ratios):
+                logger.info("Group vcov {}".format(group_vcov))
+                genome_to_vcov[genome] = ratio * group_vcov
+                logger.info("Scaled vcov {}: {}".format(genome, ratio*group_vcov))
+
+        return genome_to_vcov
 
             
