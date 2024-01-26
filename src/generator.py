@@ -7,6 +7,7 @@ from src.distributions import *
 from src.genome_resource import Rank, Genome
 from loguru import logger
 
+
 import random
 
 from src.simulator_wrappers import Simulator
@@ -200,6 +201,7 @@ class Generator:
     @staticmethod
     def generate_meta_file(out, meta_entries, summary=True):
 
+
         samples = set(sample.name for _, _, sample in meta_entries)
 
         if summary:
@@ -213,7 +215,7 @@ class Generator:
                     input()
                 conspecific_count = len(sp_meta_entries)
                 vcov_total = sum(vcov for _, vcov, _ in sp_meta_entries)
-                species = sp_meta_entries[0].genome.r_species
+                species = sp_meta_entries[0].genome.taxon_at(Rank.Species)
 
                 out.write(f"{sample}\t{species}\t{vcov_total}\t{conspecific_count}\t{'None' if conspecific_count > 1 else sp_meta_entries[0].genome.path }\n")
 

@@ -12,6 +12,7 @@ class Rank:
     Family = "Family"
     Genus = "Genus"
     Species = "Species"
+    Strain = "Strain"
     All = [Domain, Phylum, Class, Order, Family, Genus, Species]
 
 class Genome:
